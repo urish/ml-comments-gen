@@ -36,4 +36,48 @@ describe('dumpAst', () => {
       'EndOfFileToken',
     ]);
   });
+
+  it('should include comment nodes in the AST', () => {
+    expect(dumpAst('a = 5 /* magic */;', true)).toEqual([
+      'ExpressionStatement BinaryExpression Identifier',
+      'ExpressionStatement BinaryExpression FirstAssignment',
+      'ExpressionStatement BinaryExpression FirstLiteralToken',
+      '/* magic */',
+      'ExpressionStatement SemicolonToken',
+      'EndOfFileToken',
+    ]);
+  });
+
+  it('should support multiple comments', () => {
+    expect(dumpAst('/*start*/a// two\n = /*five*/5 /* magic */ /* more magic */;//EOF', true)).toEqual([
+      '/*start*/',
+      'ExpressionStatement BinaryExpression Identifier',
+      '// two',
+      'ExpressionStatement BinaryExpression FirstAssignment',
+      '/*five*/',
+      'ExpressionStatement BinaryExpression FirstLiteralToken',
+      '/* magic */',
+      '/* more magic */',
+      'ExpressionStatement SemicolonToken',
+      '//EOF',
+      'EndOfFileToken',
+    ]);
+  });
+
+  it('should support functions with docstrings', () => {
+    expect(dumpAst('/**\n * test\n */ function f() { return 5; }', true)).toEqual([
+      '/**\n * test\n */',
+      'FunctionDeclaration FunctionKeyword',
+      'FunctionDeclaration Identifier',
+      'FunctionDeclaration OpenParenToken',
+      'FunctionDeclaration SyntaxList',
+      'FunctionDeclaration CloseParenToken',
+      'FunctionDeclaration Block FirstPunctuation',
+      'FunctionDeclaration Block ReturnStatement ReturnKeyword',
+      'FunctionDeclaration Block ReturnStatement FirstLiteralToken',
+      'FunctionDeclaration Block ReturnStatement SemicolonToken',
+      'FunctionDeclaration Block CloseBraceToken',
+      'EndOfFileToken',
+    ]);
+  });
 });
