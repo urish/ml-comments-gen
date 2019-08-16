@@ -17,6 +17,7 @@ export interface IInputRecord {
   paths: string[];
   line: string;
   character: string;
+  comments: string;
   text: string;
 }
 
@@ -24,6 +25,7 @@ export interface IProcessedEntry {
   id: string;
   line: number;
   character: number;
+  comments: string;
   ast: string;
 }
 
@@ -33,7 +35,8 @@ function prepareEntry(input: IInputRecord) {
     id,
     line,
     character,
-    ast: dumpAst(input.text, true).map((e) => e.replace(/~/g, '')),
+    comments: input.comments,
+    ast: dumpAst(input.text, true),
   };
 }
 
@@ -46,6 +49,11 @@ inputStream
   .on('line', (entry) => {
     const parsedRecord = JSON.parse(entry);
     const observation = prepareEntry(parsedRecord);
+
+    if (!observation.comments) {
+      // skip entries without a comment
+      return;
+    }
 
     const outputLine = JSON.stringify(observation) + NEW_LINE;
     appendFileSync(datasetPath, outputLine, { encoding: 'utf-8' });
