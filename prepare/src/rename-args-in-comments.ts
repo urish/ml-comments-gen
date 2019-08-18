@@ -7,7 +7,7 @@ export function renameArgsInComments(comments: string, source: string) {
   return tokens
     .map((token) => {
       const index = argNames.indexOf(token);
-      return index >= 0 ? `$__arg${index}$` : token;
+      return index >= 0 ? `ArgumentNumber${index}` : token;
     })
     .join('');
 }
