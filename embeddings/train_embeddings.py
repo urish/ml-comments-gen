@@ -106,7 +106,7 @@ logging.info("Size Vocabulary: {}".format(len(vocab)))
 
 if visualize:
     logging.info("Plotting Word2Vec Embeddings")
-    tsne_plot(model)
+    tsne_plot(model, df, epochs)
 
 # save model
 model.save("embeddings_word2vec.model")
