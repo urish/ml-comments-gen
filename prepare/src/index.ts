@@ -36,7 +36,7 @@ function prepareEntry(input: IInputRecord) {
     line,
     character,
     comments: input.comments,
-    ast: dumpAst(input.text),
+    ast: dumpAst(input.text, true),
   };
 }
 
