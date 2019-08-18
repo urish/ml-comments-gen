@@ -3,6 +3,7 @@ import { appendFileSync, createReadStream, writeFileSync } from 'fs';
 import { join } from 'path';
 import { createInterface } from 'readline';
 import { createGunzip } from 'zlib';
+import { cleanJsDoc } from './clean-jsdoc';
 import { dumpAst } from './dump-ast';
 import { renameArgsInComments } from './rename-args-in-comments';
 
@@ -36,7 +37,7 @@ function prepareEntry(input: IInputRecord) {
     id,
     line,
     character,
-    comments: renameArgsInComments(input.comments, input.text),
+    comments: renameArgsInComments(cleanJsDoc(input.comments), input.text),
     ast: dumpAst(input.text, true),
   };
 }
