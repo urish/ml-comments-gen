@@ -1,9 +1,10 @@
 import chalk from 'chalk';
-import { appendFileSync, writeFileSync, createReadStream } from 'fs';
+import { appendFileSync, createReadStream, writeFileSync } from 'fs';
 import { join } from 'path';
 import { createInterface } from 'readline';
 import { createGunzip } from 'zlib';
 import { dumpAst } from './dump-ast';
+import { renameArgsInComments } from './rename-args-in-comments';
 
 const input = createReadStream(join(__dirname, '../../data/typescript-all-functions.json.gz')).pipe(createGunzip());
 const datasetPath = join(__dirname, '../../data/dataset.json');
@@ -35,7 +36,7 @@ function prepareEntry(input: IInputRecord) {
     id,
     line,
     character,
-    comments: input.comments,
+    comments: renameArgsInComments(input.comments, input.text),
     ast: dumpAst(input.text, true),
   };
 }

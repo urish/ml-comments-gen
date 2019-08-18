@@ -1,10 +1,10 @@
-import 'array-flat-polyfill';
 import { tsquery } from '@phenomnomnominal/tsquery';
-import { MethodDeclaration, Node } from 'typescript';
-import { syntaxKindMap } from './syntax-kind';
+import 'array-flat-polyfill';
+import { Node } from 'typescript';
+import { functionOrMethodAST } from './ast-utils';
 
 function traverse(node: Node): string {
-  const nodeKind = syntaxKindMap[node.kind];
+  const nodeKind = tsquery.syntaxKindName(node.kind);
   if (!node.getChildren().length) {
     return nodeKind;
   }
@@ -20,15 +20,6 @@ function traverse(node: Node): string {
 }
 
 export function dumpAst(source: string, functionOrMethod = false) {
-  let ast: Node = tsquery.ast(source);
-  if (functionOrMethod) {
-    const functionNode = tsquery.query(ast, 'SourceFile>FunctionDeclaration');
-    if (functionNode[0]) {
-      ast = functionNode[0];
-    } else {
-      ast = tsquery.ast(`class __DUMMY { ${source} }`);
-      ast = tsquery.query<MethodDeclaration>(ast, 'SourceFile>ClassDeclaration>MethodDeclaration')[0];
-    }
-  }
+  const ast = functionOrMethod ? functionOrMethodAST(source) : tsquery.ast(source);
   return traverse(ast).replace(/^SourceFile \( SyntaxList | \)$/g, '');
 }
