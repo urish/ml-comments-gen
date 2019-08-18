@@ -1,5 +1,5 @@
 import 'array-flat-polyfill';
-import { createSourceFile, Node, ScriptTarget, SyntaxKind } from 'typescript';
+import { createSourceFile, Node, ScriptTarget } from 'typescript';
 import { syntaxKindMap } from './syntax-kind';
 
 function traverse(node: Node, includeComments: boolean): string {
