@@ -2,7 +2,7 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
 
-def tsne_plot(model, df, n_epochs):
+def tsne_plot(model, df, filename):
     labels = []
     tokens = []
 
@@ -36,4 +36,4 @@ def tsne_plot(model, df, n_epochs):
             va="bottom",
         )
 
-    plt.savefig("embeddings_{}_{}.png".format(df.shape[0], n_epochs))
+    plt.savefig(filename)

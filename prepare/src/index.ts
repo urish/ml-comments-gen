@@ -10,7 +10,7 @@ import { renameArgsInComments } from './rename-args-in-comments';
 const input = createReadStream(join(__dirname, '../../data/typescript-all-functions.json.gz')).pipe(createGunzip());
 const datasetPath = join(__dirname, '../../data/dataset.json');
 const NEW_LINE = '\r\n';
-const N_OBSERVATIONS = 1000;
+const N_OBSERVATIONS = 10;
 
 const inputStream = createInterface({ input });
 

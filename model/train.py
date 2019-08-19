@@ -1,9 +1,20 @@
+import re
+import time
+from os import path
+
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import numpy as np
 import pandas as pd
-from tensorflow.keras.preprocessing.text import Tokenizer
+import tensorflow as tf
+from gensim.models import Word2Vec
+from sklearn.model_selection import train_test_split
 
-dataframe = pd.read_json('../data/dataset.json', lines=True)
+from train_embeddings import train_embeddings
 
-tokenizer = Tokenizer(filters='', split=" ", lower=False)
-tokenizer.fit_on_texts(dataframe['ast'].sum())
+word2vec_model, dataset = train_embeddings(True)
 
-print(tokenizer.word_index)
+index2word = word2vec_model.wv.index2word
+vocab = word2vec_model.wv.vocab
+
+print(dataset.shape)
