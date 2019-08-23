@@ -5,6 +5,7 @@
   "license": "MIT",
   "scripts": {
     "start": "ts-node src/index.ts",
+    "predict": "ts-node src/predict.ts",
     "test": "jest"
   },
   "dependencies": {

@@ -22,6 +22,12 @@ describe('renameArgsInComments', () => {
     );
   });
 
+  it('should also support reserve mode', () => {
+    const src = `methodName(foo, bar) { return foo * bar }`;
+    expect(
+      renameArgsInComments('/* FunctionNamePlaceholder multiplies ArgumentNumber0 by ArgumentNumber1 */', src, true),
+    ).toBe('/* methodName multiplies foo by bar */');
+  });
 
   it('should not fail for methods with no arguments', () => {
     const src = `methodName() => foo * bar`;
