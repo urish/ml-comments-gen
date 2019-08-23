@@ -19,6 +19,10 @@ parser = ArgumentParser()
 
 parser.add_argument("-r", "--run", nargs="?", type=str, const=True)
 
+parser.add_argument("-e", "--epochs", nargs="?", type=int, const=True, default=100)
+
+parser.add_argument("-bs", "--batch-size", nargs="?", type=int, const=True, default=64)
+
 parser.add_argument(
     "-v", "--visualize", nargs="?", type=boolean, const=True, default=False
 )
@@ -203,8 +207,11 @@ validation_data = ([x1_test, x2_test], y_test)
 
 # --- Hyper-Parameters ---
 
-batch_size = 64
-n_epochs = 10
+batch_size = args.batch_size
+n_epochs = args.epochs
+
+print("Batch Size:", batch_size)
+print("Epochs:", n_epochs)
 
 # ------------------------
 
