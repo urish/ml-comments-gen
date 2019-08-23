@@ -1,2 +1,3 @@
-typescript-all-functions.json.gz
+*.gz
 dataset.json
+metadata.txt

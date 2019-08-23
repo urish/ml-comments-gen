@@ -3,18 +3,31 @@ import multiprocessing
 import re
 import sys
 from argparse import ArgumentParser
-from os import path
+from math import floor
+from os import path, makedirs, listdir
 
 import numpy as np
 import pandas as pd
 import spacy
-from yaspin import yaspin
 from gensim.models import Word2Vec
 from spacy_langdetect import LanguageDetector
+from yaspin import yaspin
 
 from visualize_embeddings import tsne_plot
 
 ORTH = spacy.symbols.ORTH
+
+
+def round_down(num):
+    i = str(num)
+    divisor = i[0] if num >= 10 else 1
+
+    for i in range(1, len(i)):
+        divisor = divisor + "0"
+
+    divisor = int(divisor)
+
+    return floor(num / divisor) * divisor
 
 
 def clean_token(text):
@@ -29,6 +42,9 @@ def clean_token(text):
 
     # replace tab stops
     text = re.sub(r"\t", "", text)
+
+    # replace newlines with a special "end-of-sequence" token
+    text = re.sub(r"\r\n|\r|\n", "<eos>", text)
 
     return text
 
@@ -65,6 +81,7 @@ nlp.tokenizer.add_special_case("/*", [{ORTH: "/*"}])
 nlp.tokenizer.add_special_case("*/", [{ORTH: "*/"}])
 nlp.tokenizer.add_special_case("//", [{ORTH: "//"}])
 nlp.tokenizer.add_special_case("<start>", [{ORTH: "<start>"}])
+nlp.tokenizer.add_special_case("<eos>", [{ORTH: "<eos>"}])
 nlp.tokenizer.add_special_case("<end>", [{ORTH: "<end>"}])
 
 nlp.add_pipe(clean_document, name="cleaner", last=True)
@@ -79,7 +96,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "-dd", "--dump-dataset", nargs="?", type=boolean, const=True, default=True
+    "-s", "--save-dataset", nargs="?", type=boolean, const=True, default=True
 )
 
 parser.add_argument(
@@ -88,9 +105,11 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+saveDataset = args.save_dataset
+visualize = args.visualize
+
 data_dir = "../data"
 dataset_path = path.join(data_dir, args.dataset)
-filename_word2vec_model = "word2vec.model"
 filename_dataset_clean = "dataset_clean.csv"
 
 if not path.exists(dataset_path):
@@ -100,9 +119,21 @@ if not path.exists(dataset_path):
         )
     )
 
-df = pd.read_json(dataset_path, lines=True)
+out_dir = "../runs"
 
+# create output dir
+if not path.exists(out_dir):
+    makedirs(out_dir)
+
+df = pd.read_json(dataset_path, lines=True)
 n_observations = df.shape[0]
+n_observations_r = round_down(n_observations)
+
+# create run dir
+run_dir = path.join(out_dir, str(n_observations_r))
+
+if not path.exists(run_dir):
+    makedirs(run_dir)
 
 # --- Hyper-Parameters ---
 
@@ -130,56 +161,50 @@ seed = 1
 # better results.
 epochs = 5
 
+# ------------------------
 
-@yaspin(text="Cleaning dataset...")
-def clean_dataset(df):
-    df = df.apply(lambda c: nlp(c))
-    df = df.apply(lambda doc: doc if doc.text != "" else np.nan)
-    df = df.dropna()
-    return df
+
+@yaspin(text="Cleaning comments...")
+def clean_comments(comments):
+    comments = comments.apply(lambda c: nlp(c))
+    comments = comments.apply(lambda doc: doc if doc.text != "" else np.nan)
+    return comments
 
 
 @yaspin(text="Dumping dataset...")
 def dump_dataset(df):
-    filename = get_filename(filename_dataset_clean)
-    df.to_csv(path.join(data_dir, filename), header=True)
-
-
-def get_filename(name):
-    segments = path.splitext(name)
-    filename = segments[0]
-    ext = segments[1]
-
-    return "{}_{}_{}{}".format(filename, n_observations, epochs, ext)
-
-
-@yaspin(text="Preparing model inputs...")
-def prepare_word2vec_inputs(documents):
-    # create list (of comments) of lists (tokens)
-    # e.g. [['this', 'is', 'a', 'comment'], ['second', 'comment'], ['another', 'comment']]
-    return documents.map(lambda doc: [token.text for token in doc])
+    df.to_csv(path.join(run_dir, filename_dataset_clean), header=True)
 
 
 @yaspin(text="Training Word2vec...")
-def train_word2vec(sentences):
+def train_word2vec(
+    sentences,
+    sg=1,
+    size=num_features,
+    min_count=min_word_count,
+    seed=seed,
+    window=window_size,
+    sample=downsampling,
+    iter=epochs,
+):
     model = Word2Vec(
         sentences,
-        sg=1,
-        size=num_features,
-        min_count=min_word_count,
+        sg=sg,
+        size=size,
+        min_count=min_count,
         seed=seed,
-        window=window_size,
+        window=window,
         workers=num_workers,
-        sample=downsampling,
-        iter=epochs,
+        sample=sample,
+        iter=iter,
     )
 
     return model
 
 
 @yaspin(text="Saving model...")
-def save_model(model):
-    model_path = path.join(data_dir, get_filename(filename_word2vec_model))
+def save_model(model, filename):
+    model_path = path.join(run_dir, filename)
     model.save(model_path)
 
 
@@ -188,56 +213,32 @@ def plot_embeddings(model, df, filename):
     tsne_plot(model, df, filename)
 
 
-def train_embeddings(dump_data=None, plot=None, retrain=False):
-    visualize = plot if plot is not None else args.visualize
-    dumpDataset = dump_data if dump_data is not None else args.dump_dataset
+print("Observations: {}".format(n_observations))
 
-    clean_dataset_path = path.join(data_dir, get_filename(filename_dataset_clean))
-    model_path = path.join(data_dir, get_filename(filename_word2vec_model))
+df["comments"] = clean_comments(df["comments"])
 
-    print("Observations: {}".format(n_observations))
+# remove corrupted rows (mostly comments that are written in languages other than English)
+df = df.dropna()
 
-    if path.exists(clean_dataset_path) and path.exists(model_path) and retrain == False:
-        print(
-            "Skipping training and reusing existing model. Using '{}'.".format(
-                path.basename(model_path)
-            )
-        )
+comments = df["comments"].map(lambda doc: [token.text for token in doc])
+model_comments = train_word2vec(comments)
+save_model(model_comments, "word2vec_comments.model")
 
-        model = Word2Vec.load(model_path)
+asts = df["ast"]
+asts = asts.map(lambda ast: [token for token in ast.split(" ")])
+model_asts = train_word2vec(asts, min_count=1)
+save_model(model_asts, "word2vec_asts.model")
 
-        print("Size Vocabulary:", len(model.wv.vocab))
+dataset_clean = df[["ast", "comments"]]
 
-        dataset = pd.read_csv(clean_dataset_path)
-        return model, dataset
+if saveDataset:
+    dump_dataset(dataset_clean)
 
-    comments = df["comments"]
+print("Size Vocabulary (Comments):", len(model_comments.wv.vocab))
+print("Size Vocabulary (ASTs):", len(model_asts.wv.vocab))
 
-    comments = clean_dataset(comments)
-    df["comments"] = comments
+if visualize:
+    plot_embeddings(model_comments, df, path.join(run_dir, "word2vec_comments.png"))
+    plot_embeddings(model_asts, df, path.join(run_dir, "word2vec_asts.png"))
 
-    dataset_clean = df[["ast", "comments"]]
-
-    comments = prepare_word2vec_inputs(comments)
-    model = train_word2vec(comments)
-
-    if dumpDataset:
-        dump_dataset(dataset_clean)
-
-    vocab = list(model.wv.vocab)
-    print("Size Vocabulary:", len(vocab))
-
-    if visualize:
-        filename = get_filename("word2vec.png")
-        plot_embeddings(model, df, filename)
-
-    # save model
-    save_model(model)
-
-    print("Done!")
-
-    return model, dataset_clean
-
-
-if __name__ == "__main__":
-    train_embeddings()
+print("Done!")

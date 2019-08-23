@@ -7,10 +7,15 @@ import { cleanJsDoc } from './clean-jsdoc';
 import { dumpAst } from './dump-ast';
 import { renameArgsInComments } from './rename-args-in-comments';
 
-const input = createReadStream(join(__dirname, '../../data/typescript-all-functions.json.gz')).pipe(createGunzip());
+const input = createReadStream(join(__dirname, '../../data/typescript-all-functions-100-stars.json.gz')).pipe(
+  createGunzip(),
+);
+
 const datasetPath = join(__dirname, '../../data/dataset.json');
+const metadataPath = join(__dirname, '../../data/metadata.txt');
 const NEW_LINE = '\r\n';
-const N_OBSERVATIONS = 10;
+const N_OBSERVATIONS = 4;
+const MAX_COMMENT_LENGTH = 500;
 
 const inputStream = createInterface({ input });
 
@@ -45,26 +50,71 @@ function prepareEntry(input: IInputRecord) {
 console.log(chalk.yellow('Creating dataset. Hold tight!'));
 writeFileSync(datasetPath, '');
 
-let processedEntries = 0;
+let allObservations = 0;
+let avgLength = 0;
+let skipped = 0;
+let nExamples = 0;
+let maxComment = 0;
+let maxAST = 0;
 
 inputStream
   .on('line', (entry) => {
+    allObservations++;
+
     const parsedRecord = JSON.parse(entry);
     const observation = prepareEntry(parsedRecord);
 
-    if (!observation.comments) {
-      // skip entries without a comment
+    const commentLength = observation.comments.length;
+    const astLength = observation.ast.length;
+
+    maxComment = Math.max(maxComment, commentLength);
+    maxAST = Math.max(maxAST, astLength);
+
+    if (!observation.comments || observation.comments.length > MAX_COMMENT_LENGTH) {
+      // skip entries without a comment or comments that exceed the max length
+      skipped++;
       return;
     }
 
+    nExamples++;
     const outputLine = JSON.stringify(observation) + NEW_LINE;
     appendFileSync(datasetPath, outputLine, { encoding: 'utf-8' });
 
-    if (++processedEntries >= N_OBSERVATIONS) {
+    // calculate average length over all processed comments
+    avgLength = (avgLength * (nExamples - 1)) / nExamples + observation.comments.length / nExamples;
+
+    if (nExamples >= N_OBSERVATIONS) {
       inputStream.close();
     }
   })
   .on('close', () => {
+    const metadata = stripIndent`
+      Skipped: ${skipped}
+      Average Comment Length: ${avgLength.toFixed(2)}
+      Max Comment Length: ${maxComment}/${MAX_COMMENT_LENGTH}
+      Max AST Length: ${maxAST}
+      Observations: ${allObservations}
+      Entries in Dataset: ${nExamples}
+    `;
+
+    // save metadata to disk
+    writeFileSync(metadataPath, metadata);
+
+    console.log(chalk.yellow(metadata));
     console.log(chalk.green('Dataset successfully created.'));
     process.exit(0);
   });
+
+function stripIndent(strings: TemplateStringsArray, ...values: any[]) {
+  const endResult = String.raw(strings, ...values);
+  const match = endResult.match(/^[ \t]*(?=\S)/gm);
+
+  if (match === null) {
+    return endResult;
+  }
+
+  const indent = Math.min(...match.map((el) => el.length));
+  const regexp = new RegExp('^[ \\t]{' + indent + '}', 'gm');
+
+  return (indent > 0 ? endResult.replace(regexp, '') : endResult).trim();
+}
