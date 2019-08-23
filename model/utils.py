@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
@@ -103,3 +104,9 @@ def check_encoding(x1, x2, y, x1_idx2word, x2_idx2word):
         print("X2", idx, x2_decoded)
         print("Y ", idx, y_decoded)
         print("---")
+
+
+def save_tokenizer(tokenizer, file_path):
+    with open(file_path, "wb") as handle:
+        pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        print("Tokenizer successfully saved ({})".format(file_path))

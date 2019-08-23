@@ -1,6 +1,6 @@
 import re
-import time
 import sys
+import time
 from argparse import ArgumentParser
 from os import path
 
@@ -9,9 +9,16 @@ import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from utils import max_length, prepare_dataset, check_encoding, create_embedding_matrix
 from gensim.models import Word2Vec
 from sklearn.model_selection import train_test_split
+
+from utils import (
+    check_encoding,
+    create_embedding_matrix,
+    max_length,
+    prepare_dataset,
+    save_tokenizer,
+)
 
 boolean = lambda x: (str(x).lower() == "true")
 
@@ -238,4 +245,8 @@ model.fit(
 
 # save model
 model.save(run_dir + "/model.h5")
-print("Model successfully saved.")
+print("Model successfully saved")
+
+# save tokenizer
+save_tokenizer(ast_tokenizer, path.join(run_dir, "ast_tokenizer.pickle"))
+save_tokenizer(comment_tokenizer, path.join(run_dir, "comment_tokenizer.pickle"))
