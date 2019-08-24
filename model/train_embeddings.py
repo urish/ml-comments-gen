@@ -20,9 +20,12 @@ ORTH = spacy.symbols.ORTH
 
 def round_down(num):
     i = str(num)
-    divisor = i[0] if num >= 10 else 1
+    divisor_max = 2 if num < 1000 else 3
+    divisor_idx = min(len(i), divisor_max)
 
-    for i in range(1, len(i)):
+    divisor = "".join(i[:divisor_idx])
+
+    for i in range(len(divisor), len(i)):
         divisor = divisor + "0"
 
     divisor = int(divisor)
@@ -126,14 +129,9 @@ if not path.exists(out_dir):
     makedirs(out_dir)
 
 df = pd.read_json(dataset_path, lines=True)
-n_observations = df.shape[0]
-n_observations_r = round_down(n_observations)
 
 # create run dir
-run_dir = path.join(out_dir, str(n_observations_r))
-
-if not path.exists(run_dir):
-    makedirs(run_dir)
+run_dir = ""
 
 # --- Hyper-Parameters ---
 
@@ -213,12 +211,20 @@ def plot_embeddings(model, df, filename):
     tsne_plot(model, df, filename)
 
 
-print("Observations: {}".format(n_observations))
-
 df["comments"] = clean_comments(df["comments"])
 
 # remove corrupted rows (mostly comments that are written in languages other than English)
 df = df.dropna()
+
+n_observations = df.shape[0]
+n_observations_r = round_down(n_observations)
+
+run_dir = path.join(out_dir, str(n_observations_r))
+
+if not path.exists(run_dir):
+    makedirs(run_dir)
+
+print("Observations: {}".format(n_observations))
 
 comments = df["comments"].map(lambda doc: [token.text for token in doc])
 model_comments = train_word2vec(comments)

@@ -9,10 +9,11 @@ def max_length(seqs, max_seq_len=500):
     return length if length < max_seq_len else max_seq_len
 
 
-def prepare_dataset(raw_x1, raw_x2, max_seq_len, num_classes):
+def prepare_dataset(raw_x1, raw_x2, max_seq_len, num_classes, name):
     x1_maxlen = max_length(raw_x1, max_seq_len)
     x2_maxlen = max_length(raw_x2, max_seq_len)
 
+    print("Preparing {} Dataset".format(name))
     print("[Pepare Dataset] Max Sequence x1:", x1_maxlen)
     print("[Pepare Dataset] Max Sequence x2:", x2_maxlen)
 
@@ -110,3 +111,10 @@ def save_tokenizer(tokenizer, file_path):
     with open(file_path, "wb") as handle:
         pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
         print("Tokenizer successfully saved ({})".format(file_path))
+
+
+def load_tokenizer(file_path):
+    with open(file_path, "rb") as handle:
+        tokenizer = pickle.load(handle)
+        print("Tokenizer loaded ({})".format(file_path))
+        return tokenizer

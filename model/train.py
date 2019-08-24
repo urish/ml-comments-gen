@@ -26,7 +26,9 @@ parser = ArgumentParser()
 
 parser.add_argument("-r", "--run", nargs="?", type=str, const=True)
 
-parser.add_argument("-e", "--epochs", nargs="?", type=int, const=True, default=100)
+parser.add_argument("-e", "--epochs", nargs="?", type=int, const=True, default=200)
+
+parser.add_argument("-wv", "--word-vectors", nargs="?", type=int, const=True)
 
 parser.add_argument("-bs", "--batch-size", nargs="?", type=int, const=True, default=64)
 
@@ -47,6 +49,7 @@ visualize = args.visualize
 run = args.run
 debug = args.debug
 tpu = args.tpu
+word_vectors = args.word_vectors
 
 run_dir = "../runs/{}".format(run)
 dataset_path = path.join(run_dir, "dataset_clean.csv")
@@ -57,8 +60,13 @@ if not path.exists(run_dir):
     )
 
 
-def load_model(name):
-    return Word2Vec.load(path.join(run_dir, "word2vec_{}.model".format(name)))
+def load_w2v_model(name):
+    w2v_dir = run_dir if not word_vectors else "../runs/{}".format(word_vectors)
+
+    if word_vectors:
+        print("Using embeddings from '{}'".format(w2v_dir))
+
+    return Word2Vec.load(path.join(w2v_dir, "word2vec_{}.model".format(name)))
 
 
 def create_tokenizer(w2v_model, name):
@@ -94,8 +102,8 @@ n_observations = df.shape[0]
 
 print("Observations: {}".format(n_observations))
 
-word2vec_comments = load_model("comments")
-word2vec_asts = load_model("asts")
+word2vec_comments = load_w2v_model("comments")
+word2vec_asts = load_w2v_model("asts")
 
 comment_tokenizer = create_tokenizer(word2vec_comments, "Comments")
 ast_tokenizer = create_tokenizer(word2vec_asts, "ASTs")
@@ -115,8 +123,8 @@ x1_train, x1_test, x2_train, x2_test = train_test_split(
 )
 
 print("x1 Train:", len(x1_train))
-print("x1 Test:", len(x1_test))
 print("x2 Train:", len(x2_train))
+print("x1 Test:", len(x1_test))
 print("x2 Test:", len(x2_test))
 
 # add +1 to leave space for sequence paddings
@@ -128,10 +136,12 @@ MAX_LENGTH = 500
 
 # finalize inputs to the model
 x1_train, x2_train, y_train = prepare_dataset(
-    x1_train, x2_train, MAX_LENGTH, x2_vocab_size
+    x1_train, x2_train, MAX_LENGTH, x2_vocab_size, "Train"
 )
 
-x1_test, x2_test, y_test = prepare_dataset(x1_test, x2_test, MAX_LENGTH, x2_vocab_size)
+x1_test, x2_test, y_test = prepare_dataset(
+    x1_test, x2_test, MAX_LENGTH, x2_vocab_size, "Test"
+)
 
 max_length = max(x1_train.shape[1], x2_train.shape[1])
 
@@ -170,8 +180,8 @@ x1_model = tf.keras.layers.Embedding(
     trainable=False,
 )(x1_input)
 
-x1_model = tf.keras.layers.GRU(1024, return_sequences=True, name="x1_gru_1")(x1_model)
-x1_model = tf.keras.layers.GRU(512, return_sequences=True, name="x1_gru_2")(x1_model)
+x1_model = tf.keras.layers.GRU(256, return_sequences=True, name="x1_gru_1")(x1_model)
+x1_model = tf.keras.layers.GRU(256, return_sequences=True, name="x1_gru_2")(x1_model)
 x1_model = tf.keras.layers.Dense(128, activation="relu", name="x1_out_hidden")(x1_model)
 
 # --- X2 ---
@@ -186,8 +196,8 @@ x2_model = tf.keras.layers.Embedding(
     trainable=False,
 )(x2_input)
 
-x2_model = tf.keras.layers.GRU(1024, return_sequences=True, name="x2_gru_1")(x2_model)
-x2_model = tf.keras.layers.GRU(512, return_sequences=True, name="x2_gru_2")(x2_model)
+x2_model = tf.keras.layers.GRU(256, return_sequences=True, name="x2_gru_1")(x2_model)
+x2_model = tf.keras.layers.GRU(256, return_sequences=True, name="x2_gru_2")(x2_model)
 x2_model = tf.keras.layers.Dense(128, activation="relu", name="x2_out_hidden")(x2_model)
 
 # Encoder --- END ---
@@ -195,7 +205,7 @@ x2_model = tf.keras.layers.Dense(128, activation="relu", name="x2_out_hidden")(x
 # Decoder --- START ---
 
 decoder = tf.keras.layers.concatenate([x1_model, x2_model])
-decoder = tf.keras.layers.GRU(1024, return_sequences=False, name="decoder_gru")(decoder)
+decoder = tf.keras.layers.GRU(512, return_sequences=False, name="decoder_gru")(decoder)
 decoder_output = tf.keras.layers.Dense(x2_vocab_size, activation="softmax")(decoder)
 
 # Decoder --- END ---
