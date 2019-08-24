@@ -16,7 +16,6 @@ colorama==0.4.1
 cycler==0.10.0
 cymem==2.0.2
 docutils==0.14
-en-core-web-sm==2.1.0
 gast==0.2.2
 gensim==3.8.0
 google-pasta==0.1.7
