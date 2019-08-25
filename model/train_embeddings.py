@@ -227,24 +227,24 @@ if not path.exists(run_dir):
 print("Observations: {}".format(n_observations))
 
 comments = df["comments"].map(lambda doc: [token.text for token in doc])
-model_comments = train_word2vec(comments)
-save_model(model_comments, "word2vec_comments.model")
+# model_comments = train_word2vec(comments)
+# save_model(model_comments, "word2vec_comments.model")
 
 asts = df["ast"]
 asts = asts.map(lambda ast: [token for token in ast.split(" ")])
-model_asts = train_word2vec(asts, min_count=1)
-save_model(model_asts, "word2vec_asts.model")
+# model_asts = train_word2vec(asts, min_count=1)
+# save_model(model_asts, "word2vec_asts.model")
 
 dataset_clean = df[["ast", "comments"]]
 
 if saveDataset:
     dump_dataset(dataset_clean)
 
-print("Size Vocabulary (Comments):", len(model_comments.wv.vocab))
-print("Size Vocabulary (ASTs):", len(model_asts.wv.vocab))
+# print("Size Vocabulary (Comments):", len(model_comments.wv.vocab))
+# print("Size Vocabulary (ASTs):", len(model_asts.wv.vocab))
 
-if visualize:
-    plot_embeddings(model_comments, df, path.join(run_dir, "word2vec_comments.png"))
-    plot_embeddings(model_asts, df, path.join(run_dir, "word2vec_asts.png"))
+# if visualize:
+#     plot_embeddings(model_comments, df, path.join(run_dir, "word2vec_comments.png"))
+#     plot_embeddings(model_asts, df, path.join(run_dir, "word2vec_asts.png"))
 
 print("Done!")
