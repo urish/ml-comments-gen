@@ -1,54 +1,36 @@
-import numpy as np
 import pickle
-from tensorflow.keras.utils import to_categorical
+from os import path
+
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import numpy as np
+import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.utils import to_categorical
+
+from parameters import UNITS, MAX_LENGTH
 
 
-def max_length(seqs, max_seq_len=500):
+def max_length(seqs, max_seq_len=MAX_LENGTH):
     length = max(len(s) for s in seqs)
     return length if length < max_seq_len else max_seq_len
 
 
-def prepare_dataset(raw_x1, raw_x2, max_seq_len, num_classes, name):
-    x1_maxlen = max_length(raw_x1, max_seq_len)
-    x2_maxlen = max_length(raw_x2, max_seq_len)
+def prepare_dataset(input_raw, target_raw, max_seq_len, name):
+    input_maxlen = max_length(input_raw, max_seq_len)
+    target_maxlen = max_length(target_raw, max_seq_len)
 
     print("Preparing {} Dataset".format(name))
-    print("[Pepare Dataset] Max Sequence x1:", x1_maxlen)
-    print("[Pepare Dataset] Max Sequence x2:", x2_maxlen)
 
-    maxlen = max(x1_maxlen, x2_maxlen)
+    input_tensor = pad_sequences(
+        input_raw, maxlen=input_maxlen, padding="post", truncating="post"
+    )
 
-    print("[Pepare Dataset] Max Sequence:", maxlen)
+    target_tensor = pad_sequences(
+        target_raw, maxlen=target_maxlen, padding="post", truncating="post"
+    )
 
-    x1, x2, y = list(), list(), list()
-    for x2_idx, seq in enumerate(raw_x2):
-
-        x1_seq = pad_sequences(
-            [raw_x1[x2_idx]], maxlen=maxlen, padding="post", truncating="post"
-        )[0]
-
-        for i in range(1, len(seq)):
-            # add AST
-            x1.append(x1_seq)
-
-            # add the entire sequence to the input and only keep the next word for the output
-            in_seq, out_seq = seq[:i], seq[i]
-
-            # apply padding and encode sequence
-            in_seq = pad_sequences(
-                [in_seq], maxlen=maxlen, padding="post", truncating="post"
-            )[0]
-
-            # one hot encode output sequence
-            out_seq = to_categorical([out_seq], num_classes=num_classes)[0]
-            y.append(out_seq)
-
-            # cut the input seq to fixed length
-            x2.append(in_seq)
-
-    x1, x2, y = np.array(x1), np.array(x2), np.array(y)
-    return x1, x2, y
+    return input_tensor, input_maxlen, target_tensor, target_maxlen
 
 
 def create_embedding_matrix(dim, word_index, word_vectors):
@@ -70,43 +52,6 @@ def create_embedding_matrix(dim, word_index, word_vectors):
     return embedding_matrix
 
 
-"""
-This function can be used to debug the preprocessed dataset and print out
-encoded inputs as well as the label.
-
-Be aware of calling this function on a large dataset as it will produce dozens
-of print statemenets.
-"""
-
-
-def check_encoding(x1, x2, y, x1_idx2word, x2_idx2word):
-    print("--- Check Encoding ---")
-    for idx, x1_encoded in enumerate(x1):
-        x1_decoded = list()
-        x2_decoded = ""
-        y_decoded = ""
-
-        # decode x1
-        for x1_seq_idx in x1_encoded:
-            if x1_seq_idx != 0:
-                x1_decoded.append(x1_idx2word[x1_seq_idx])
-
-        # decode x2
-        for x2_seq_idx in reversed(x2[idx]):
-            if x2_seq_idx != 0:
-                x2_decoded = x2_idx2word[x2_seq_idx] + " " + x2_decoded
-
-        y_encoded = y[idx]
-        y_argmax = np.argmax(y_encoded)
-        if y_argmax != 0:
-            y_decoded = x2_idx2word[y_argmax]
-
-        print("X1", idx, " ".join(x1_decoded))
-        print("X2", idx, x2_decoded)
-        print("Y ", idx, y_decoded)
-        print("---")
-
-
 def save_tokenizer(tokenizer, file_path):
     with open(file_path, "wb") as handle:
         pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -118,3 +63,79 @@ def load_tokenizer(file_path):
         tokenizer = pickle.load(handle)
         print("Tokenizer loaded ({})".format(file_path))
         return tokenizer
+
+
+def evaluate(
+    ast_in,
+    ast_tokenizer,
+    comment_tokenizer,
+    max_length_input,
+    max_length_target,
+    encoder,
+    decoder,
+    out_dir=None,
+    plot_attention=False,
+):
+    attention_plot = np.zeros((max_length_target, max_length_input))
+
+    input_seq = ast_tokenizer.texts_to_sequences([ast_in])
+
+    input_seq = tf.keras.preprocessing.sequence.pad_sequences(
+        input_seq, maxlen=max_length_input, padding="post", truncating="post"
+    )
+
+    inputs = tf.convert_to_tensor(input_seq)
+
+    result = ""
+
+    hidden = [tf.zeros((1, UNITS))]
+    enc_out, enc_hidden = encoder(inputs, hidden)
+
+    dec_hidden = enc_hidden
+    dec_input = tf.expand_dims([comment_tokenizer.word_index["<start>"]], 0)
+
+    for t in range(max_length_target):
+        predictions, dec_hidden, attention_weights = decoder(
+            dec_input, dec_hidden, enc_out
+        )
+
+        # storing the attention weights to plot later on
+        attention_weights = tf.reshape(attention_weights, (-1,))
+        attention_plot[t] = attention_weights.numpy()
+
+        predicted_id = tf.argmax(predictions[0]).numpy()
+
+        result += comment_tokenizer.index_word[predicted_id] + " "
+
+        if comment_tokenizer.index_word[predicted_id] == "<end>":
+            break
+
+        # the predicted ID is fed back into the model
+        dec_input = tf.expand_dims([predicted_id], 0)
+
+    if plot_attention and out_dir and path.exists(out_dir):
+        attention_plot = attention_plot[
+            : len(result.split(" ")), : len(ast_in.split(" "))
+        ]
+        plot_attention(out_dir, attention_plot, ast_in.split(" "), result.split(" "))
+
+    return result
+
+
+def plot_attention(out_dir, attention, ast_in, predicted_comment):
+    print("Plotting attention...")
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.matshow(attention, cmap="viridis")
+
+    fontdict = {"fontsize": 14}
+
+    ax.set_xticklabels([""] + ast_in, fontdict=fontdict, rotation=90)
+    ax.set_yticklabels([""] + predicted_comment, fontdict=fontdict)
+
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+
+    plt.savefig(path.join(out_dir, "attention.png"))
+    print("Attention saved to '{}'".format(out_dir))
+
