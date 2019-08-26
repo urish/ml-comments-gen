@@ -1,3 +1,4 @@
+import pickle
 import re
 import sys
 import time
@@ -10,9 +11,9 @@ import tensorflow as tf
 from gensim.models import Word2Vec
 from sklearn.model_selection import train_test_split
 
-from parameters import EMBEDDING_DIM, UNITS, MAX_LENGTH
+from model import BahdanauAttention, Decoder, Encoder
+from parameters import EMBEDDING_DIM, MAX_LENGTH, UNITS
 from utils import evaluate, max_length, prepare_dataset, save_tokenizer
-from model import Encoder, Decoder, BahdanauAttention
 
 boolean = lambda x: (str(x).lower() == "true")
 
@@ -43,6 +44,7 @@ visualize = args.visualize
 run = args.run
 debug = args.debug
 tpu = args.tpu
+epochs = args.epochs
 word_vectors = args.word_vectors
 
 run_dir = "../runs/{}".format(run)
@@ -50,7 +52,9 @@ dataset_path = path.join(run_dir, "dataset_clean.csv")
 
 if not path.exists(run_dir):
     sys.exit(
-        "Error: Run {} does not exist. Make sure to train embeddings first.".format(run)
+        "Error: Run {} does not exist. Make sure to prepare some data first.".format(
+            run
+        )
     )
 
 
@@ -150,7 +154,10 @@ def accuracy_function(real, pred):
 
 
 BUFFER_SIZE = len(input_tensor)
-BATCH_SIZE = 64 if len(input_tensor) >= 64 else len(input_tensor)
+
+BATCH_SIZE = (
+    args.batch_size if len(input_tensor) >= args.batch_size else len(input_tensor)
+)
 
 encoder = Encoder(x1_vocab_size, EMBEDDING_DIM, UNITS, BATCH_SIZE)
 decoder = Decoder(x2_vocab_size, EMBEDDING_DIM, UNITS, BATCH_SIZE)
@@ -243,7 +250,6 @@ def train_step(encoder_input, target, enc_hidden):
     return batch_loss
 
 
-EPOCHS = args.epochs
 steps_per_epoch = len(input_tensor) // BATCH_SIZE
 
 checkpoint_dir = run_dir
@@ -252,7 +258,7 @@ checkpoint = tf.train.Checkpoint(optimizer=optimizer, encoder=encoder, decoder=d
 
 print("Steps per Epoch:", steps_per_epoch)
 
-for epoch in range(EPOCHS):
+for epoch in range(epochs):
     start = time.time()
 
     enc_hidden = encoder.initialize_hidden_state()
@@ -262,33 +268,28 @@ for epoch in range(EPOCHS):
         batch_loss = train_step(inp, targ, enc_hidden)
         total_loss += batch_loss
 
-        if batch % 10 == 0:
+        if batch % 100 == 0:
             print(
-                "Epoch {}/{} Batch {} ({}/{}) Loss {:.4f}".format(
-                    epoch + 1,
-                    EPOCHS,
-                    batch,
-                    (batch + 1) * BATCH_SIZE,
-                    len(input_tensor),
-                    batch_loss.numpy(),
+                "Epoch {}/{} Batch {} Loss {:.4f}".format(
+                    epoch + 1, epochs, batch, batch_loss.numpy()
                 )
             )
 
     print(
         "Epoch {}/{} Loss {:.4f} Accuracy {:.3f}%".format(
-            epoch + 1, EPOCHS, total_loss / BATCH_SIZE, accuracy.result().numpy()
+            epoch + 1, epochs, total_loss / BATCH_SIZE, accuracy.result().numpy()
         )
     )
 
     print("Time taken for 1 epoch {:.3f} sec\n".format(time.time() - start))
 
 # save weights
-encoder_path = path.join(run_dir, "encoder.h5")
+encoder_path = path.join(run_dir, "encoder")
 encoder.save_weights(encoder_path)
 print("Encoder weights saved ({})".format(encoder_path))
 
-decoder_path = path.join(run_dir, "decoder.h5")
-encoder.save_weights(decoder_path)
+decoder_path = path.join(run_dir, "decoder")
+decoder.save_weights(decoder_path)
 print("Decoder weights saved ({})".format(decoder_path))
 
 print("------------------------------")
@@ -307,6 +308,8 @@ result = evaluate(
     max_length_target=max_length_target,
     encoder=encoder,
     decoder=decoder,
+    out_dir=run_dir,
+    plot=True,
 )
 
 print("Input: %s\n" % (ast_in))
@@ -315,3 +318,18 @@ print("Predicted translation: {}\n".format(result))
 # save tokenizer
 save_tokenizer(ast_tokenizer, path.join(run_dir, "ast_tokenizer.pickle"))
 save_tokenizer(comment_tokenizer, path.join(run_dir, "comment_tokenizer.pickle"))
+
+# save training variables
+params = {
+    "max_length_input": max_length_input,
+    "max_length_target": max_length_target,
+    "x1_vocab_size": x1_vocab_size,
+    "x2_vocab_size": x2_vocab_size,
+    "batch_size": BATCH_SIZE,
+}
+
+params_path = path.join(run_dir, "params.pickle")
+
+with open(params_path, "wb") as f:
+    pickle.dump(params, f)
+    print("\nParams successfully saved ({})".format(params_path))

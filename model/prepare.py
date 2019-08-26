@@ -4,7 +4,7 @@ import re
 import sys
 from argparse import ArgumentParser
 from math import floor
-from os import path, makedirs, listdir
+from os import listdir, makedirs, path
 
 import numpy as np
 import pandas as pd
@@ -102,6 +102,8 @@ parser.add_argument(
     "-s", "--save-dataset", nargs="?", type=boolean, const=True, default=True
 )
 
+parser.add_argument("-t", "--train", nargs="?", type=boolean, const=True, default=False)
+
 parser.add_argument(
     "-d", "--dataset", nargs="?", type=str, const=True, default="dataset.json"
 )
@@ -110,6 +112,7 @@ args = parser.parse_args()
 
 saveDataset = args.save_dataset
 visualize = args.visualize
+train = args.train
 
 data_dir = "../data"
 dataset_path = path.join(data_dir, args.dataset)
@@ -227,24 +230,29 @@ if not path.exists(run_dir):
 print("Observations: {}".format(n_observations))
 
 comments = df["comments"].map(lambda doc: [token.text for token in doc])
-# model_comments = train_word2vec(comments)
-# save_model(model_comments, "word2vec_comments.model")
+
+if train:
+    model_comments = train_word2vec(comments)
+    save_model(model_comments, "word2vec_comments.model")
+    print("Size Vocabulary (Comments):", len(model_comments.wv.vocab))
+
+    if visualize:
+        plot_embeddings(model_comments, df, path.join(run_dir, "word2vec_comments.png"))
 
 asts = df["ast"]
 asts = asts.map(lambda ast: [token for token in ast.split(" ")])
-# model_asts = train_word2vec(asts, min_count=1)
-# save_model(model_asts, "word2vec_asts.model")
+
+if train:
+    model_asts = train_word2vec(asts, min_count=1)
+    save_model(model_asts, "word2vec_asts.model")
+    print("Size Vocabulary (ASTs):", len(model_asts.wv.vocab))
+
+    if visualize:
+        plot_embeddings(model_asts, df, path.join(run_dir, "word2vec_asts.png"))
 
 dataset_clean = df[["ast", "comments"]]
 
 if saveDataset:
     dump_dataset(dataset_clean)
-
-# print("Size Vocabulary (Comments):", len(model_comments.wv.vocab))
-# print("Size Vocabulary (ASTs):", len(model_asts.wv.vocab))
-
-# if visualize:
-#     plot_embeddings(model_comments, df, path.join(run_dir, "word2vec_comments.png"))
-#     plot_embeddings(model_asts, df, path.join(run_dir, "word2vec_asts.png"))
 
 print("Done!")

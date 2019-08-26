@@ -74,7 +74,7 @@ def evaluate(
     encoder,
     decoder,
     out_dir=None,
-    plot_attention=False,
+    plot=False,
 ):
     attention_plot = np.zeros((max_length_target, max_length_input))
 
@@ -113,7 +113,7 @@ def evaluate(
         # the predicted ID is fed back into the model
         dec_input = tf.expand_dims([predicted_id], 0)
 
-    if plot_attention and out_dir and path.exists(out_dir):
+    if plot and out_dir and path.exists(out_dir):
         attention_plot = attention_plot[
             : len(result.split(" ")), : len(ast_in.split(" "))
         ]
