@@ -58,6 +58,9 @@ decoder_input = tf.zeros((BATCH_SIZE, 1))
 decoder(decoder_input, enc_hidden, enc_output)
 decoder.load_weights(decoder_file)
 
+encoder.summary()
+decoder.summary()
+
 ast_tokenizer_file = path.join(run_dir, "ast_tokenizer.pickle")
 comment_tokenizer_file = path.join(run_dir, "comment_tokenizer.pickle")
 

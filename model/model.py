@@ -6,7 +6,9 @@ class Encoder(tf.keras.Model):
         super(Encoder, self).__init__()
         self.batch_size = batch_size
         self.encoder_units = encoder_units
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
+        self.embedding = tf.keras.layers.Embedding(
+            vocab_size, embedding_dim, mask_zero=True
+        )
         self.gru = tf.keras.layers.GRU(
             self.encoder_units,
             return_sequences=True,
