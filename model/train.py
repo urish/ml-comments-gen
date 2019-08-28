@@ -313,7 +313,7 @@ result = evaluate(
 )
 
 print("Input: %s\n" % (ast_in))
-print("Predicted translation: {}\n".format(result))
+print("Predicted Comment: {}\n".format(result))
 
 # save tokenizer
 save_tokenizer(ast_tokenizer, path.join(run_dir, "ast_tokenizer.pickle"))
