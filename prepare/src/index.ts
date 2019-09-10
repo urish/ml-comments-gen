@@ -14,7 +14,7 @@ const input = createReadStream(join(__dirname, '../../data/typescript-all-functi
 const datasetPath = join(__dirname, '../../data/dataset.json');
 const metadataPath = join(__dirname, '../../data/metadata.txt');
 const NEW_LINE = '\r\n';
-const N_OBSERVATIONS = 1;
+const N_OBSERVATIONS = 100000;
 const MAX_COMMENT_LENGTH = 500;
 
 const inputStream = createInterface({ input });
@@ -51,7 +51,8 @@ console.log(chalk.yellow('Creating dataset. Hold tight!'));
 writeFileSync(datasetPath, '');
 
 let allObservations = 0;
-let avgLength = 0;
+let avgCommentLength = 0;
+let avgAstLength = 0;
 let skipped = 0;
 let nExamples = 0;
 let maxComment = 0;
@@ -81,7 +82,8 @@ inputStream
     appendFileSync(datasetPath, outputLine, { encoding: 'utf-8' });
 
     // calculate average length over all processed comments
-    avgLength = (avgLength * (nExamples - 1)) / nExamples + observation.comments.length / nExamples;
+    avgCommentLength = calcSlidingAverage(avgCommentLength, nExamples, observation.comments.length);
+    avgAstLength = calcSlidingAverage(avgAstLength, nExamples, observation.ast.length);
 
     if (nExamples >= N_OBSERVATIONS) {
       inputStream.close();
@@ -90,8 +92,9 @@ inputStream
   .on('close', () => {
     const metadata = stripIndent`
       Skipped: ${skipped}
-      Average Comment Length: ${avgLength.toFixed(2)}
+      Average Comment Length: ${avgCommentLength.toFixed(2)}
       Max Comment Length: ${maxComment}/${MAX_COMMENT_LENGTH}
+      Average AST Length: ${avgAstLength.toFixed(2)}
       Max AST Length: ${maxAST}
       Observations: ${allObservations}
       Entries in Dataset: ${nExamples}
@@ -117,4 +120,8 @@ function stripIndent(strings: TemplateStringsArray, ...values: any[]) {
   const regexp = new RegExp('^[ \\t]{' + indent + '}', 'gm');
 
   return (indent > 0 ? endResult.replace(regexp, '') : endResult).trim();
+}
+
+function calcSlidingAverage(curr: number, numExamples: number, exampleLength: number) {
+  return (curr * (numExamples - 1)) / numExamples + exampleLength / numExamples;
 }
