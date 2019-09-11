@@ -14,8 +14,9 @@ const input = createReadStream(join(__dirname, '../../data/typescript-all-functi
 const datasetPath = join(__dirname, '../../data/dataset.json');
 const metadataPath = join(__dirname, '../../data/metadata.txt');
 const NEW_LINE = '\r\n';
-const N_OBSERVATIONS = 1;
+const N_OBSERVATIONS = 20000;
 const MAX_COMMENT_LENGTH = 500;
+const MAX_AST_LENGTH = 250;
 
 const inputStream = createInterface({ input });
 
@@ -42,6 +43,7 @@ function prepareEntry(input: IInputRecord) {
     id,
     line,
     character,
+    code: input.text,
     comments: renameArgsInComments(cleanJsDoc(input.comments), input.text),
     ast: dumpAst(input.text, true),
   };
@@ -65,13 +67,13 @@ inputStream
     const parsedRecord = JSON.parse(entry);
     const observation = prepareEntry(parsedRecord);
 
-    const commentLength = observation.comments.length;
-    const astLength = observation.ast.length;
+    const commentLength = observation.comments.split(' ').length;
+    const astLength = observation.ast.split(' ').length;
 
     maxComment = Math.max(maxComment, commentLength);
     maxAST = Math.max(maxAST, astLength);
 
-    if (!observation.comments || observation.comments.length > MAX_COMMENT_LENGTH) {
+    if (!observation.comments || commentLength > MAX_COMMENT_LENGTH || astLength > MAX_AST_LENGTH) {
       // skip entries without a comment or comments that exceed the max length
       skipped++;
       return;
@@ -82,8 +84,8 @@ inputStream
     appendFileSync(datasetPath, outputLine, { encoding: 'utf-8' });
 
     // calculate average length over all processed comments
-    avgCommentLength = calcSlidingAverage(avgCommentLength, nExamples, observation.comments.length);
-    avgAstLength = calcSlidingAverage(avgAstLength, nExamples, observation.ast.length);
+    avgCommentLength = calcSlidingAverage(avgCommentLength, nExamples, commentLength);
+    avgAstLength = calcSlidingAverage(avgAstLength, nExamples, astLength);
 
     if (nExamples >= N_OBSERVATIONS) {
       inputStream.close();
