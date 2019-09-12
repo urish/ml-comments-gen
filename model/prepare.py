@@ -5,6 +5,7 @@ import sys
 from argparse import ArgumentParser
 from math import floor
 from os import listdir, makedirs, path
+from shutil import copyfile
 
 import numpy as np
 import pandas as pd
@@ -115,6 +116,8 @@ visualize = args.visualize
 train = args.train
 
 data_dir = "../data"
+metadata_filename = "metadata.txt"
+metadata_path = path.join(data_dir, metadata_filename)
 dataset_path = path.join(data_dir, args.dataset)
 filename_dataset_clean = "dataset_clean.csv"
 
@@ -254,5 +257,8 @@ dataset_clean = df[["ast", "comments"]]
 
 if saveDataset:
     dump_dataset(dataset_clean)
+
+print("Copying metadata")
+copyfile(metadata_path, path.join(run_dir, metadata_filename))
 
 print("Done!")
