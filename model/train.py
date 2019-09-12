@@ -123,10 +123,7 @@ x1_train, x2_train, y_train, max_seq_len = prepare_dataset(
     "Train", x1_train, x2_train, MAX_LENGTH, x2_vocab_size
 )
 
-print(comment_tokenizer.index_word)
-
-print(y_train)
-
+print("Observations (Train)", max(len(x1_train), len(x2_train)))
 print("Max Sequence Length:", max_seq_len)
 
 if debug:
