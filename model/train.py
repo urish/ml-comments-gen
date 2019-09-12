@@ -12,8 +12,13 @@ from gensim.models import Word2Vec
 from sklearn.model_selection import train_test_split
 
 from model import BahdanauAttention, Decoder, Encoder
-from parameters import EMBEDDING_DIM, MAX_LENGTH, UNITS
+from parameters import EMBEDDING_DIM, MAX_LENGTH, UNITS, VOCAB_SIZE
 from utils import evaluate, max_length, prepare_dataset, save_tokenizer
+
+# TF GPU Config
+# physical_devices = tf.config.experimental.list_physical_devices('GPU')
+# assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+# tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 boolean = lambda x: (str(x).lower() == "true")
 
@@ -67,11 +72,12 @@ def load_w2v_model(name):
     return Word2Vec.load(path.join(w2v_dir, "word2vec_{}.model".format(name)))
 
 
-def create_tokenizer(name):
+def create_tokenizer(name, num_words=None):
     print("Creating tokenizer for '{}'".format(name))
+    print("Using num_words={}".format(num_words))
 
     tokenizer = tf.keras.preprocessing.text.Tokenizer(
-        filters="", split=" ", lower=False, oov_token="UNK"
+        filters="", split=" ", lower=False, oov_token="UNK", num_words=num_words
     )
 
     return tokenizer
@@ -85,7 +91,7 @@ print("Observations: {}".format(n_observations))
 asts = df["ast"]
 comments = df["comments"]
 
-comment_tokenizer = create_tokenizer("Comments")
+comment_tokenizer = create_tokenizer("Comments", VOCAB_SIZE)
 comment_tokenizer.fit_on_texts(comments)
 
 ast_tokenizer = create_tokenizer("ASTs")
@@ -110,9 +116,13 @@ print("x2 Train:", len(x2_train))
 # print("x1 Test:", len(x1_test))
 # print("x2 Test:", len(x2_test))
 
+len_comment_word_index = len(comment_tokenizer.word_index) + 1
+
 # add +1 to leave space for sequence paddings
 x1_vocab_size = len(ast_tokenizer.word_index) + 1
-x2_vocab_size = len(comment_tokenizer.word_index) + 1
+x2_vocab_size = (
+    len_comment_word_index if len_comment_word_index < VOCAB_SIZE else VOCAB_SIZE
+)
 
 print("x1_vocab_size:", x1_vocab_size)
 print("x2_vocab_size:", x2_vocab_size)
