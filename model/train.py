@@ -134,90 +134,88 @@ if debug:
         ast_tokenizer.index_word,
         comment_tokenizer.index_word,
     )
+resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
+tf.config.experimental_connect_to_host(resolver.master())
+tf.tpu.experimental.initialize_tpu_system(resolver)
+strategy = tf.distribute.experimental.TPUStrategy(resolver)
 
-x1_input = Input(shape=x1_train[0].shape, name="x1_input")
-x1_model = Embedding(
-    x1_vocab_size, EMBEDDING_DIM, input_length=max_seq_len, mask_zero=True
-)(x1_input)
-x1_model = LSTM(256, return_sequences=True, name="x1_lstm_1")(x1_model)
-x1_model = BatchNormalization()(x1_model)
-x1_model = Dense(128, activation="relu", name="x1_out_hidden")(x1_model)
+with strategy.scope():
+    x1_input = Input(shape=x1_train[0].shape, name="x1_input")
+    x1_model = Embedding(
+        x1_vocab_size, EMBEDDING_DIM, input_length=max_seq_len, mask_zero=True
+    )(x1_input)
+    x1_model = LSTM(256, return_sequences=True, name="x1_lstm_1")(x1_model)
+    x1_model = BatchNormalization()(x1_model)
+    x1_model = Dense(128, activation="relu", name="x1_out_hidden")(x1_model)
 
-x2_input = Input(shape=x2_train[0].shape, name="x2_input")
-x2_model = Embedding(
-    x2_vocab_size, EMBEDDING_DIM, input_length=max_seq_len, mask_zero=True
-)(x2_input)
-x2_model = LSTM(256, return_sequences=True, name="x2_lstm_1")(x2_model)
-x2_model = LSTM(256, return_sequences=True, name="x2_lstm_2")(x2_model)
-x2_model = BatchNormalization()(x2_model)
-x2_model = Dense(128, activation="relu", name="x2_out_hidden")(x2_model)
+    x2_input = Input(shape=x2_train[0].shape, name="x2_input")
+    x2_model = Embedding(
+        x2_vocab_size, EMBEDDING_DIM, input_length=max_seq_len, mask_zero=True
+    )(x2_input)
+    x2_model = LSTM(256, return_sequences=True, name="x2_lstm_1")(x2_model)
+    x2_model = LSTM(256, return_sequences=True, name="x2_lstm_2")(x2_model)
+    x2_model = BatchNormalization()(x2_model)
+    x2_model = Dense(128, activation="relu", name="x2_out_hidden")(x2_model)
 
-# decoder
-decoder = concatenate([x1_model, x2_model])
-decoder = LSTM(512, return_sequences=False, name="decoder_lstm")(decoder)
-decoder_output = Dense(x2_vocab_size, activation="softmax")(decoder)
+    # decoder
+    decoder = concatenate([x1_model, x2_model])
+    decoder = LSTM(512, return_sequences=False, name="decoder_lstm")(decoder)
+    decoder_output = Dense(x2_vocab_size, activation="softmax")(decoder)
 
-# compile model
-model = Model(inputs=[x1_input, x2_input], outputs=decoder_output)
-model.compile(
-    loss="categorical_crossentropy", optimizer="rmsprop", metrics=["accuracy"]
-)
-
-if args.tpu:
-    model = tf.contrib.tpu.keras_to_tpu_model(
-        model,
-        strategy=tf.contrib.tpu.TPUDistributionStrategy(
-            tf.contrib.cluster_resolver.TPUClusterResolver()
-        ),
+    # compile model
+    model = Model(inputs=[x1_input, x2_input], outputs=decoder_output)
+    model.compile(
+        loss="categorical_crossentropy", optimizer="rmsprop", metrics=["accuracy"]
     )
 
-print("Buckle up and hold tight! We are about to start the training...")
-model.fit(
-    [x1_train, x2_train],
-    y_train,
-    epochs=epochs,
-    batch_size=batch_size,
-    shuffle=False,
-    callbacks=[],
-)
 
-# save model
-model.save(run_dir + "/model.h5")
-print("Model successfully saved.")
+    print("Buckle up and hold tight! We are about to start the training...")
+    model.fit(
+        [x1_train, x2_train],
+        y_train,
+        epochs=epochs,
+        batch_size=batch_size,
+        shuffle=False,
+        callbacks=[],
+    )
 
-print("------------------------------")
-print("|           TEST             |")
-print("------------------------------")
+    # save model
+    model.save(run_dir + "/model.h5")
+    print("Model successfully saved.")
 
-# test model on single input
+    print("------------------------------")
+    print("|           TEST             |")
+    print("------------------------------")
 
-ast_in = np.random.choice(asts.values, 1)[0]
+    # test model on single input
 
-result = evaluate(
-    ast_in,
-    ast_tokenizer=ast_tokenizer,
-    comment_tokenizer=comment_tokenizer,
-    max_seq_len=max_seq_len,
-    model=model,
-)
+    ast_in = np.random.choice(asts.values, 1)[0]
 
-print("Input: %s\n" % (ast_in))
-print("Predicted Comment: {}\n".format(result))
+    result = evaluate(
+        ast_in,
+        ast_tokenizer=ast_tokenizer,
+        comment_tokenizer=comment_tokenizer,
+        max_seq_len=max_seq_len,
+        model=model,
+    )
 
-# save tokenizer
-save_tokenizer(ast_tokenizer, path.join(run_dir, "ast_tokenizer.pickle"))
-save_tokenizer(comment_tokenizer, path.join(run_dir, "comment_tokenizer.pickle"))
+    print("Input: %s\n" % (ast_in))
+    print("Predicted Comment: {}\n".format(result))
 
-# save training variables
-params = {
-    "max_seq_len": max_seq_len,
-    "x1_vocab_size": x1_vocab_size,
-    "x2_vocab_size": x2_vocab_size,
-    "batch_size": batch_size,
-}
+    # save tokenizer
+    save_tokenizer(ast_tokenizer, path.join(run_dir, "ast_tokenizer.pickle"))
+    save_tokenizer(comment_tokenizer, path.join(run_dir, "comment_tokenizer.pickle"))
 
-params_path = path.join(run_dir, "params.pickle")
+    # save training variables
+    params = {
+        "max_seq_len": max_seq_len,
+        "x1_vocab_size": x1_vocab_size,
+        "x2_vocab_size": x2_vocab_size,
+        "batch_size": batch_size,
+    }
 
-with open(params_path, "wb") as f:
-    pickle.dump(params, f)
-    print("\nParams successfully saved ({})".format(params_path))
+    params_path = path.join(run_dir, "params.pickle")
+
+    with open(params_path, "wb") as f:
+        pickle.dump(params, f)
+        print("\nParams successfully saved ({})".format(params_path))
