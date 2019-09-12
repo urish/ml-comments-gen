@@ -16,40 +16,78 @@ def max_length(seqs, max_seq_len=MAX_LENGTH):
     return length if length < max_seq_len else max_seq_len
 
 
-def prepare_dataset(input_raw, target_raw, max_seq_len, name):
-    input_maxlen = max_length(input_raw, max_seq_len)
-    target_maxlen = max_length(target_raw, max_seq_len)
+def prepare_dataset(name, raw_x1, raw_x2, max_seq_len, x2_vocab_size):
+    max_len_x1 = max_length(raw_x1, max_seq_len)
+    max_len_x2 = max_length(raw_x2, max_seq_len)
 
-    print("Preparing {} Dataset".format(name))
+    print("Max X1", max_len_x1)
+    print("Max X2", max_len_x2)
 
-    input_tensor = pad_sequences(
-        input_raw, maxlen=input_maxlen, padding="post", truncating="post"
-    )
+    max_len = max(max_len_x1, max_len_x2)
 
-    target_tensor = pad_sequences(
-        target_raw, maxlen=target_maxlen, padding="post", truncating="post"
-    )
+    x1, x2, y = list(), list(), list()
+    for x2_idx, seq in enumerate(raw_x2):
 
-    return input_tensor, input_maxlen, target_tensor, target_maxlen
+        x1_encoded = pad_sequences(
+            [raw_x1[x2_idx]], maxlen=max_len, padding="post", truncating="post"
+        )[0]
+
+        for i in range(1, len(seq)):
+            # add function signature
+            x1.append(x1_encoded)
+
+            # add the entire sequence to the input and only keep the next word for the output
+            in_seq, out_seq = seq[:i], seq[i]
+
+            # apply padding and encode sequence
+            in_seq = pad_sequences(
+                [in_seq], maxlen=max_len, padding="post", truncating="post"
+            )[0]
+
+            # one hot encode output sequence
+            out_seq = to_categorical([out_seq], num_classes=x2_vocab_size)[0]
+            y.append(out_seq)
+
+            # cut the input seq to fixed length
+            x2.append(in_seq)
+
+    x1, x2, y = np.array(x1), np.array(x2), np.array(y)
+    return x1, x2, y, max_len
 
 
-def create_embedding_matrix(dim, word_index, word_vectors):
-    max_num_words = len(word_index) + 1
+"""
+This function can be used to debug the preprocessed dataset and print out
+encoded inputs as well as the label.
+Be aware of calling this function on a large dataset as it will produce dozens
+of print statemenets.
+"""
 
-    # we initialize the matrix with zeros
-    embedding_matrix = np.zeros((max_num_words, dim))
 
-    for word, i in word_index.items():
-        if i >= max_num_words:
-            continue
+def check_encoding(x1, x2, y, ast_idx2word, comment_idx2word):
+    print("--- Check Encoding ---")
+    for idx, ast in enumerate(x1):
+        x1_decoded = ""
+        x2_decoded = ""
+        y_decoded = ""
 
-        try:
-            embedding_vector = word_vectors[word]
-            embedding_matrix[i] = embedding_vector
-        except:
-            pass
+        # decode one hot encoding for x1
+        for x1_encoded in ast:
+            x1_decoded += ast_idx2word[x1_encoded] + " "
 
-    return embedding_matrix
+        # decode x2
+        for x2_encoded_num in reversed(x2[idx]):
+            if x2_encoded_num != 0:
+                x2_decoded = comment_idx2word[x2_encoded_num] + " " + x2_decoded
+
+        y_encoded = y[idx]
+        y_argmax = np.argmax(y_encoded)
+        if y_argmax != 0:
+            y_decoded = comment_idx2word[y_argmax]
+
+        print("X1", idx, x1_decoded)
+        print("X2", x2_decoded)
+        print("Y", y_decoded)
+        print("---")
 
 
 def save_tokenizer(tokenizer, file_path):
@@ -65,77 +103,33 @@ def load_tokenizer(file_path):
         return tokenizer
 
 
-def evaluate(
-    ast_in,
-    ast_tokenizer,
-    comment_tokenizer,
-    max_length_input,
-    max_length_target,
-    encoder,
-    decoder,
-    out_dir=None,
-    plot=False,
-):
-    attention_plot = np.zeros((max_length_target, max_length_input))
+def evaluate(ast_in, ast_tokenizer, comment_tokenizer, max_seq_len, model):
+    result = "<start>"
 
-    input_seq = ast_tokenizer.texts_to_sequences([ast_in])
-
-    input_seq = tf.keras.preprocessing.sequence.pad_sequences(
-        input_seq, maxlen=max_length_input, padding="post", truncating="post"
+    signature_seq = ast_tokenizer.texts_to_sequences([ast_in])[0]
+    signature_seq = pad_sequences(
+        [signature_seq], maxlen=max_seq_len, padding="post", truncating="post"
     )
+    signature_seq = np.array(signature_seq)
 
-    inputs = tf.convert_to_tensor(input_seq)
-
-    result = ""
-
-    hidden = [tf.zeros((1, UNITS))]
-    enc_out, enc_hidden = encoder(inputs, hidden)
-
-    dec_hidden = enc_hidden
-    dec_input = tf.expand_dims([comment_tokenizer.word_index["<start>"]], 0)
-
-    for t in range(max_length_target):
-        predictions, dec_hidden, attention_weights = decoder(
-            dec_input, dec_hidden, enc_out
+    for i in range(max_seq_len):
+        body_seq = comment_tokenizer.texts_to_sequences([result])[0]
+        body_seq = pad_sequences(
+            [body_seq], maxlen=max_seq_len, padding="post", truncating="post"
         )
+        body_seq = np.array(body_seq)
 
-        # storing the attention weights to plot later on
-        attention_weights = tf.reshape(attention_weights, (-1,))
-        attention_plot[t] = attention_weights.numpy()
+        # predict next token
+        y_hat = model.predict([signature_seq, body_seq], verbose=0)
+        y_hat = np.argmax(y_hat)
 
-        predicted_id = tf.argmax(predictions[0]).numpy()
+        # map idx to word
+        word = comment_tokenizer.index_word[y_hat]
 
-        result += comment_tokenizer.index_word[predicted_id] + " "
+        # append as input for generating the next token
+        result += " " + word
 
-        if comment_tokenizer.index_word[predicted_id] == "<end>":
+        if word is None or word == "<end>":
             break
 
-        # the predicted ID is fed back into the model
-        dec_input = tf.expand_dims([predicted_id], 0)
-
-    if plot and out_dir and path.exists(out_dir):
-        attention_plot = attention_plot[
-            : len(result.split(" ")), : len(ast_in.split(" "))
-        ]
-        plot_attention(out_dir, attention_plot, ast_in.split(" "), result.split(" "))
-
     return result
-
-
-def plot_attention(out_dir, attention, ast_in, predicted_comment):
-    print("Plotting attention...")
-    fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.matshow(attention, cmap="viridis")
-
-    fontdict = {"fontsize": 14}
-
-    ax.set_xticklabels([""] + ast_in, fontdict=fontdict, rotation=90)
-    ax.set_yticklabels([""] + predicted_comment, fontdict=fontdict)
-
-    ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
-    ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
-
-    plt.savefig(path.join(out_dir, "attention.png"))
-    print("Attention saved to '{}'".format(out_dir))
-

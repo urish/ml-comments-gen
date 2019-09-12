@@ -8,17 +8,25 @@ from os import path
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+
+from tensorflow.keras.models import Model
+
+from tensorflow.keras.layers import (
+    Embedding,
+    concatenate,
+    LSTM,
+    BatchNormalization,
+    Dropout,
+    Input,
+    Reshape,
+    Dense,
+)
+
 from gensim.models import Word2Vec
 from sklearn.model_selection import train_test_split
 
-from model import BahdanauAttention, Decoder, Encoder
 from parameters import EMBEDDING_DIM, MAX_LENGTH, UNITS, VOCAB_SIZE
-from utils import evaluate, max_length, prepare_dataset, save_tokenizer
-
-# TF GPU Config
-# physical_devices = tf.config.experimental.list_physical_devices('GPU')
-# assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
-# tf.config.experimental.set_memory_growth(physical_devices[0], True)
+from utils import evaluate, max_length, prepare_dataset, save_tokenizer, check_encoding
 
 boolean = lambda x: (str(x).lower() == "true")
 
@@ -49,6 +57,7 @@ visualize = args.visualize
 run = args.run
 debug = args.debug
 tpu = args.tpu
+batch_size = args.batch_size
 epochs = args.epochs
 word_vectors = args.word_vectors
 
@@ -61,15 +70,6 @@ if not path.exists(run_dir):
             run
         )
     )
-
-
-def load_w2v_model(name):
-    w2v_dir = run_dir if not word_vectors else "../runs/{}".format(word_vectors)
-
-    if word_vectors:
-        print("Using embeddings from '{}'".format(w2v_dir))
-
-    return Word2Vec.load(path.join(w2v_dir, "word2vec_{}.model".format(name)))
 
 
 def create_tokenizer(name, num_words=None):
@@ -101,20 +101,11 @@ ast_tokenizer.fit_on_texts(asts)
 ast_sequences = ast_tokenizer.texts_to_sequences(asts)
 comment_sequences = comment_tokenizer.texts_to_sequences(comments)
 
-# train, test split
-seed = 1
-test_size = 0.33
-# x1_train, x1_test, x2_train, x2_test = train_test_split(
-#     ast_sequences, comment_sequences, test_size=test_size, random_state=seed
-# )
-
 x1_train = ast_sequences
 x2_train = comment_sequences
 
 print("x1 Train:", len(x1_train))
 print("x2 Train:", len(x2_train))
-# print("x1 Test:", len(x1_test))
-# print("x2 Test:", len(x2_test))
 
 len_comment_word_index = len(comment_tokenizer.word_index) + 1
 
@@ -128,179 +119,74 @@ print("x1_vocab_size:", x1_vocab_size)
 print("x2_vocab_size:", x2_vocab_size)
 
 # finalize inputs to the model
-input_tensor, max_length_input, target_tensor, max_length_target = prepare_dataset(
-    x1_train, x2_train, MAX_LENGTH, "Train"
+x1_train, x2_train, y_train, max_seq_len = prepare_dataset(
+    "Train", x1_train, x2_train, MAX_LENGTH, x2_vocab_size
 )
 
-print("Max Sequence Input:", max_length_input)
-print("Max Sequence Target:", max_length_target)
+print(comment_tokenizer.index_word)
 
-# x1_test, x2_test, y_test = prepare_dataset(
-#     x1_test, x2_test, MAX_LENGTH, x2_vocab_size, "Test"
-# )
+print(y_train)
 
-
-optimizer = tf.keras.optimizers.Adam()
-loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-    from_logits=True, reduction="none"
-)
-
-
-def loss_function(real, pred):
-    mask = tf.math.logical_not(tf.math.equal(real, 0))
-    loss_ = loss_object(real, pred)
-
-    mask = tf.cast(mask, dtype=loss_.dtype)
-    loss_ *= mask
-
-    return tf.reduce_mean(loss_)
-
-
-accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
-
-
-def accuracy_function(real, pred):
-    return accuracy.update_state(real, pred)
-
-
-BUFFER_SIZE = len(input_tensor)
-
-BATCH_SIZE = (
-    args.batch_size if len(input_tensor) >= args.batch_size else len(input_tensor)
-)
-
-encoder = Encoder(x1_vocab_size, EMBEDDING_DIM, UNITS, BATCH_SIZE)
-decoder = Decoder(x2_vocab_size, EMBEDDING_DIM, UNITS, BATCH_SIZE)
-
-# Create TF.dataset
-
-dataset = tf.data.Dataset.from_tensor_slices((input_tensor, target_tensor)).shuffle(
-    BUFFER_SIZE
-)
-
-dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
-
-# get sample batch for test outputs
-example_encoder_batch, example_target_batch = next(iter(dataset))
-
-print("Sample Batch Shapes:", example_encoder_batch.shape, example_target_batch.shape)
+print("Max Sequence Length:", max_seq_len)
 
 if debug:
-    # test encoder output
-    sample_hidden = encoder.initialize_hidden_state()
-    sample_output, sample_hidden = encoder(example_encoder_batch, sample_hidden)
-
-    print(
-        "Encoder output shape: (batch size, sequence length, units) {}".format(
-            sample_output.shape
-        )
+    check_encoding(
+        x1_train,
+        x2_train,
+        y_train,
+        ast_tokenizer.index_word,
+        comment_tokenizer.index_word,
     )
 
-    print(
-        "Encoder Hidden state shape: (batch size, units) {}".format(sample_hidden.shape)
+x1_input = Input(shape=x1_train[0].shape, name="x1_input")
+x1_model = Embedding(
+    x1_vocab_size, EMBEDDING_DIM, input_length=max_seq_len, mask_zero=True
+)(x1_input)
+x1_model = LSTM(256, return_sequences=True, name="x1_lstm_1")(x1_model)
+x1_model = BatchNormalization()(x1_model)
+x1_model = Dense(128, activation="relu", name="x1_out_hidden")(x1_model)
+
+x2_input = Input(shape=x2_train[0].shape, name="x2_input")
+x2_model = Embedding(
+    x2_vocab_size, EMBEDDING_DIM, input_length=max_seq_len, mask_zero=True
+)(x2_input)
+x2_model = LSTM(256, return_sequences=True, name="x2_lstm_1")(x2_model)
+x2_model = LSTM(256, return_sequences=True, name="x2_lstm_2")(x2_model)
+x2_model = BatchNormalization()(x2_model)
+x2_model = Dense(128, activation="relu", name="x2_out_hidden")(x2_model)
+
+# decoder
+decoder = concatenate([x1_model, x2_model])
+decoder = LSTM(512, return_sequences=False, name="decoder_lstm")(decoder)
+decoder_output = Dense(x2_vocab_size, activation="softmax")(decoder)
+
+# compile model
+model = Model(inputs=[x1_input, x2_input], outputs=decoder_output)
+model.compile(
+    loss="categorical_crossentropy", optimizer="rmsprop", metrics=["accuracy"]
+)
+
+if args.tpu:
+    model = tf.contrib.tpu.keras_to_tpu_model(
+        model,
+        strategy=tf.contrib.tpu.TPUDistributionStrategy(
+            tf.contrib.cluster_resolver.TPUClusterResolver()
+        ),
     )
 
-    # test attention
-    attention_layer = BahdanauAttention(10)
-    attention_result, attention_weights = attention_layer(sample_hidden, sample_output)
+print("Buckle up and hold tight! We are about to start the training...")
+model.fit(
+    [x1_train, x2_train],
+    y_train,
+    epochs=epochs,
+    batch_size=batch_size,
+    shuffle=False,
+    callbacks=[],
+)
 
-    print(
-        "Attention result shape: (batch size, units) {}".format(attention_result.shape)
-    )
-    print(
-        "Attention weights shape: (batch_size, sequence_length, 1) {}".format(
-            attention_weights.shape
-        )
-    )
-
-    # test decoder output
-    sample_decoder_output, _, _ = decoder(
-        tf.random.uniform((BATCH_SIZE, 1)), sample_hidden, sample_output
-    )
-
-    print(
-        "Decoder output shape: (batch_size, vocab size) {}".format(
-            sample_decoder_output.shape
-        )
-    )
-
-# --- Training ---
-
-
-@tf.function
-def train_step(encoder_input, target, enc_hidden):
-    loss = 0
-
-    with tf.GradientTape() as tape:
-        enc_output, enc_hidden = encoder(encoder_input, enc_hidden)
-
-        dec_hidden = enc_hidden
-
-        decoder_input = tf.expand_dims(
-            [comment_tokenizer.word_index["<start>"]] * BATCH_SIZE, 1
-        )
-
-        # Teacher forcing - feeding the target as the next input
-        for t in range(1, target.shape[1]):
-            # passing enc_output to the decoder
-            predictions, dec_hidden, _ = decoder(decoder_input, dec_hidden, enc_output)
-
-            correct_label = target[:, t]
-            loss += loss_function(correct_label, predictions)
-            accuracy_function(correct_label, predictions)
-
-            # using teacher forcing
-            decoder_input = tf.expand_dims(correct_label, 1)
-
-    batch_loss = loss / int(target.shape[1])
-    variables = encoder.trainable_variables + decoder.trainable_variables
-    gradients = tape.gradient(loss, variables)
-    optimizer.apply_gradients(zip(gradients, variables))
-
-    return batch_loss
-
-
-steps_per_epoch = len(input_tensor) // BATCH_SIZE
-
-checkpoint_dir = run_dir
-checkpoint_prefix = path.join(checkpoint_dir, "ckpt")
-checkpoint = tf.train.Checkpoint(optimizer=optimizer, encoder=encoder, decoder=decoder)
-
-print("Steps per Epoch:", steps_per_epoch)
-
-for epoch in range(epochs):
-    start = time.time()
-
-    enc_hidden = encoder.initialize_hidden_state()
-    total_loss = 0
-
-    for (batch, (inp, targ)) in enumerate(dataset.take(steps_per_epoch)):
-        batch_loss = train_step(inp, targ, enc_hidden)
-        total_loss += batch_loss
-
-        if batch % 100 == 0:
-            print(
-                "Epoch {}/{} Batch {} Loss {:.4f}".format(
-                    epoch + 1, epochs, batch, batch_loss.numpy()
-                )
-            )
-
-    print(
-        "Epoch {}/{} Loss {:.4f} Accuracy {:.3f}%".format(
-            epoch + 1, epochs, total_loss / BATCH_SIZE, accuracy.result().numpy()
-        )
-    )
-
-    print("Time taken for 1 epoch {:.3f} sec\n".format(time.time() - start))
-
-# save weights
-encoder_path = path.join(run_dir, "encoder")
-encoder.save_weights(encoder_path)
-print("Encoder weights saved ({})".format(encoder_path))
-
-decoder_path = path.join(run_dir, "decoder")
-decoder.save_weights(decoder_path)
-print("Decoder weights saved ({})".format(decoder_path))
+# save model
+model.save(run_dir + "/model.h5")
+print("Model successfully saved.")
 
 print("------------------------------")
 print("|           TEST             |")
@@ -314,12 +200,8 @@ result = evaluate(
     ast_in,
     ast_tokenizer=ast_tokenizer,
     comment_tokenizer=comment_tokenizer,
-    max_length_input=max_length_input,
-    max_length_target=max_length_target,
-    encoder=encoder,
-    decoder=decoder,
-    out_dir=run_dir,
-    plot=True,
+    max_seq_len=max_seq_len,
+    model=model,
 )
 
 print("Input: %s\n" % (ast_in))
@@ -331,11 +213,10 @@ save_tokenizer(comment_tokenizer, path.join(run_dir, "comment_tokenizer.pickle")
 
 # save training variables
 params = {
-    "max_length_input": max_length_input,
-    "max_length_target": max_length_target,
+    "max_seq_len": max_seq_len,
     "x1_vocab_size": x1_vocab_size,
     "x2_vocab_size": x2_vocab_size,
-    "batch_size": BATCH_SIZE,
+    "batch_size": batch_size,
 }
 
 params_path = path.join(run_dir, "params.pickle")

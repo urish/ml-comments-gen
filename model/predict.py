@@ -6,7 +6,7 @@ from os import path
 import numpy as np
 import tensorflow as tf
 
-from model import Encoder, Decoder
+from tensorflow.keras.models import load_model
 from utils import load_tokenizer, evaluate
 from parameters import UNITS, EMBEDDING_DIM
 
@@ -30,36 +30,16 @@ if not path.exists(run_dir):
     )
 
 params = {}
-
 with open(path.join(run_dir, "params.pickle"), "rb") as f:
     params = pickle.load(f)
 
 print(params)
 
-BATCH_SIZE = params.get("batch_size")
-max_length_input = params.get("max_length_input")
-max_length_target = params.get("max_length_target")
-x1_vocab_size = params.get("x1_vocab_size")
-x2_vocab_size = params.get("x2_vocab_size")
+max_seq_len = params.get("max_seq_len")
 
-encoder_file = path.join(run_dir, "encoder")
-decoder_file = path.join(run_dir, "decoder")
-
-# initialize encoder
-encoder = Encoder(x1_vocab_size, EMBEDDING_DIM, UNITS, BATCH_SIZE)
-encoder_input = tf.zeros((BATCH_SIZE, max_length_input))
-enc_hidden = encoder.initialize_hidden_state()
-enc_output, enc_hidden = encoder(encoder_input, enc_hidden)
-encoder.load_weights(encoder_file)
-
-# initialize decoder
-decoder = Decoder(x2_vocab_size, EMBEDDING_DIM, UNITS, BATCH_SIZE)
-decoder_input = tf.zeros((BATCH_SIZE, 1))
-decoder(decoder_input, enc_hidden, enc_output)
-decoder.load_weights(decoder_file)
-
-encoder.summary()
-decoder.summary()
+model_file = path.join(run_dir, "model.h5")
+model = load_model(model_file)
+print("Model '{}' loaded.".format(model_file))
 
 ast_tokenizer_file = path.join(run_dir, "ast_tokenizer.pickle")
 comment_tokenizer_file = path.join(run_dir, "comment_tokenizer.pickle")
@@ -84,10 +64,8 @@ if __name__ == "__main__":
         ast_in,
         ast_tokenizer=ast_tokenizer,
         comment_tokenizer=comment_tokenizer,
-        max_length_input=max_length_input,
-        max_length_target=max_length_target,
-        encoder=encoder,
-        decoder=decoder,
+        max_seq_len=max_seq_len,
+        model=model,
     )
 
     print("AST: {}\n".format(ast_in))
