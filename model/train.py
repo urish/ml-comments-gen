@@ -30,7 +30,7 @@ parser.add_argument("-e", "--epochs", nargs="?", type=int, const=True, default=1
 
 parser.add_argument("-wv", "--word-vectors", nargs="?", type=int, const=True)
 
-parser.add_argument("-bs", "--batch-size", nargs="?", type=int, const=True, default=64)
+parser.add_argument("-bs", "--batch-size", nargs="?", type=int, const=True, default=32)
 
 parser.add_argument(
     "-v", "--visualize", nargs="?", type=boolean, const=True, default=False
