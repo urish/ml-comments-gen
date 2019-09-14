@@ -26,7 +26,7 @@ from gensim.models import Word2Vec
 from sklearn.model_selection import train_test_split
 
 from parameters import EMBEDDING_DIM, MAX_LENGTH, UNITS, VOCAB_SIZE
-from utils import evaluate, max_length, prepare_dataset, save_tokenizer, check_encoding
+from utils import evaluate, max_length, prepare_dataset, save_tokenizer, check_encoding, ConditionalScope
 
 boolean = lambda x: (str(x).lower() == "true")
 
@@ -134,12 +134,15 @@ if debug:
         ast_tokenizer.index_word,
         comment_tokenizer.index_word,
     )
-resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
-tf.config.experimental_connect_to_host(resolver.master())
-tf.tpu.experimental.initialize_tpu_system(resolver)
-strategy = tf.distribute.experimental.TPUStrategy(resolver)
 
-with strategy.scope():
+def create_tpu_scope():
+    resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
+    tf.config.experimental_connect_to_host(resolver.master())
+    tf.tpu.experimental.initialize_tpu_system(resolver)
+    strategy = tf.distribute.experimental.TPUStrategy(resolver)
+    return strategy.scope()
+
+with ConditionalScope(create_tpu_scope, tpu):
     x1_input = Input(shape=x1_train[0].shape, name="x1_input")
     x1_model = Embedding(
         x1_vocab_size, EMBEDDING_DIM, input_length=max_seq_len, mask_zero=True
@@ -168,15 +171,31 @@ with strategy.scope():
         loss="categorical_crossentropy", optimizer="rmsprop", metrics=["accuracy"]
     )
 
+    # auto-save weights
+    checkpoint_path = path.join(run_dir, 'checkpoints/cp-{epoch:05d}.ckpt')
+    latest_checkpoint = tf.train.latest_checkpoint(path.dirname(checkpoint_path))
+
+    cp_callback = tf.keras.callbacks.ModelCheckpoint(
+        checkpoint_path, verbose=1, save_weights_only=True, period=5)
+
+    if latest_checkpoint:
+        model.load_weights(latest_checkpoint)
+        initial_epoch = int(path.splitext(latest_checkpoint)[0].split('cp-')[1])
+        print("Restored model from checkpoint {}, epoch {}".format(latest_checkpoint, initial_epoch))
+    else:
+        initial_epoch = 0
+        model.save_weights(checkpoint_path.format(epoch=0))
 
     print("Buckle up and hold tight! We are about to start the training...")
     model.fit(
         [x1_train, x2_train],
         y_train,
         epochs=epochs,
+        initial_epoch=initial_epoch,
+#        steps_per_epoch=1434,
         batch_size=batch_size,
         shuffle=False,
-        callbacks=[],
+        callbacks=[cp_callback],
     )
 
     # save model

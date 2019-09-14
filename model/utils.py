@@ -133,3 +133,15 @@ def evaluate(ast_in, ast_tokenizer, comment_tokenizer, max_seq_len, model):
             break
 
     return result
+
+class ConditionalScope:
+    def __init__(self, scope_factory, enabled = True):
+        self.scope = scope_factory() if enabled else None
+    
+    def __enter__(self):
+        if self.scope:
+            self.scope.__enter__()
+
+    def __exit__(self, type, value, traceback):
+        if self.scope:
+            self.scope.__exit__(type, value, traceback)
