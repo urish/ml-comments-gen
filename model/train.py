@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.models import Model
-
 from tensorflow.keras.layers import (
     Embedding,
     concatenate,
@@ -175,8 +175,7 @@ with ConditionalScope(create_tpu_scope, tpu):
     checkpoint_path = path.join(run_dir, 'checkpoints/cp-{epoch:05d}.ckpt')
     latest_checkpoint = tf.train.latest_checkpoint(path.dirname(checkpoint_path))
 
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(
-        checkpoint_path, verbose=1, save_weights_only=True, period=5)
+    cp_callback = ModelCheckpoint(checkpoint_path, verbose=1, save_weights_only=True, period=5)
 
     if latest_checkpoint:
         model.load_weights(latest_checkpoint)
@@ -185,6 +184,9 @@ with ConditionalScope(create_tpu_scope, tpu):
     else:
         initial_epoch = 0
         model.save_weights(checkpoint_path.format(epoch=0))
+
+    # Tensorboard logs
+    tensorboard = TensorBoard(log_dir=run_dir)
 
     print("Buckle up and hold tight! We are about to start the training...")
     model.fit(
@@ -195,7 +197,7 @@ with ConditionalScope(create_tpu_scope, tpu):
 #        steps_per_epoch=1434,
         batch_size=batch_size,
         shuffle=False,
-        callbacks=[cp_callback],
+        callbacks=[cp_callback, tensorboard],
     )
 
     # save model
