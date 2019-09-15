@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { isSupportedLanguage, getNodeAtFileOffset, findParentFunction } from './utils';
-import { createSourceFile, SyntaxKind, ScriptTarget } from 'typescript';
+import { createSourceFile, ScriptTarget } from 'typescript';
 
 function getEditor(): vscode.TextEditor | null {
   const editor = vscode.window.activeTextEditor;
