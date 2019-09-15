@@ -172,7 +172,8 @@ with ConditionalScope(create_tpu_scope, tpu):
     )
 
     # auto-save weights
-    checkpoint_path = path.join(run_dir, 'checkpoints/cp-{epoch:05d}.ckpt')
+    checkpoint_home = 'gs://ml-comments-gen/runs/{}'.format(run) if tpu else run_dir
+    checkpoint_path = path.join(checkpoint_home, 'checkpoints/cp-{epoch:05d}.ckpt')
     latest_checkpoint = tf.train.latest_checkpoint(path.dirname(checkpoint_path))
 
     cp_callback = ModelCheckpoint(checkpoint_path, verbose=1, save_weights_only=True, period=5)
