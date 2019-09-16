@@ -16,12 +16,12 @@ async function main() {
   console.log('');
   console.log('*** OUTPUT ***');
 
-  let predictedComment = '';
+  let predictedComment = [];
   for (const token of predictor.predict(testFn)) {
-    predictedComment += ' ' + token;
+    predictedComment.push(token);
   }
 
-  return predictedComment;
+  return predictedComment.join(' ');
 }
 
 main()
