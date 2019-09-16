@@ -8,10 +8,10 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
-from parameters import UNITS, MAX_LENGTH
+from parameters import UNITS
 
 
-def max_length(seqs, max_seq_len=MAX_LENGTH):
+def max_length(seqs, max_seq_len):
     length = max(len(s) for s in seqs)
     return length if length < max_seq_len else max_seq_len
 
