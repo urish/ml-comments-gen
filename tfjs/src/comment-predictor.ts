@@ -51,13 +51,22 @@ export class CommentPredictor {
       Object.keys(commentTokens).find((k) => commentTokens[k] === '<start>')!,
       10
     );
+    const {
+      max_ast_len,
+      max_comment_len,
+      ast_vocab_size,
+      comment_vocab_size
+    } = this.tokenizers.params;
+
     const ast = this.ast(functionDecl);
     const astVector = ast
       .split(' ')
+      .slice(0, max_ast_len)
       .map((token) => (token in astTokens ? astTokens[token] : astTokens['UNK']));
-
-    const { max_comment_len, ast_vocab_size, comment_vocab_size } = this.tokenizers.params;
-    const inputSeq = tf.oneHot(astVector, ast_vocab_size).expandDims();
+    const inputSeq = tf
+      .oneHot(astVector, ast_vocab_size)
+      .pad([[0, max_ast_len - astVector.length], [0, 0]])
+      .expandDims();
     let statesValues = this.encoderModel.predict(inputSeq) as tf.Tensor[];
 
     // Populate the first character of target sequence with the start character.
