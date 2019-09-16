@@ -40,7 +40,7 @@ export class CommentPredictor {
       const nextCommentToken = (yHat.argMax(1).arraySync() as number[])[0];
       x2.push(nextCommentToken);
       const tokenValue = commentTokens[nextCommentToken];
-      yield tokenValue === '<eos>' ? '\n' : tokenValue + ' ';
+      yield tokenValue === '<eol>' ? '\n' : tokenValue + ' ';
       if (tokenValue === '*/' || tokenValue === '<end>') {
         return;
       }

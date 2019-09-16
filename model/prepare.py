@@ -48,7 +48,7 @@ def clean_token(text):
     text = re.sub(r"\t", "", text)
 
     # replace newlines with a special "end-of-sequence" token
-    text = re.sub(r"\r\n|\r|\n", "<eos>", text)
+    text = re.sub(r"\r\n|\r|\n", "<eol>", text)
 
     return text
 
@@ -85,7 +85,7 @@ nlp.tokenizer.add_special_case("/*", [{ORTH: "/*"}])
 nlp.tokenizer.add_special_case("*/", [{ORTH: "*/"}])
 nlp.tokenizer.add_special_case("//", [{ORTH: "//"}])
 nlp.tokenizer.add_special_case("<start>", [{ORTH: "<start>"}])
-nlp.tokenizer.add_special_case("<eos>", [{ORTH: "<eos>"}])
+nlp.tokenizer.add_special_case("<eol>", [{ORTH: "<eol>"}])
 nlp.tokenizer.add_special_case("<end>", [{ORTH: "<end>"}])
 
 nlp.add_pipe(clean_document, name="cleaner", last=True)
