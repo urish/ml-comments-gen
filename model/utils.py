@@ -1,100 +1,19 @@
 import pickle
-from os import path
-
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import numpy as np
-import tensorflow as tf
+from tensorflow.keras.models import Model, load_model
+from tensorflow.keras.layers import Input
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.utils import to_categorical
 
 from parameters import UNITS
-
 
 def max_length(seqs, max_seq_len):
     length = max(len(s) for s in seqs)
     return length if length < max_seq_len else max_seq_len
 
-
-def prepare_dataset(name, raw_x1, raw_x2, max_seq_len, x2_vocab_size):
-    max_len_x1 = max_length(raw_x1, max_seq_len)
-    max_len_x2 = max_length(raw_x2, max_seq_len)
-
-    print("Max X1", max_len_x1)
-    print("Max X2", max_len_x2)
-
-    max_len = max(max_len_x1, max_len_x2)
-
-    x1, x2, y = list(), list(), list()
-    for x2_idx, seq in enumerate(raw_x2):
-
-        x1_encoded = pad_sequences(
-            [raw_x1[x2_idx]], maxlen=max_len, padding="post", truncating="post"
-        )[0]
-
-        for i in range(1, len(seq)):
-            # add function signature
-            x1.append(x1_encoded)
-
-            # add the entire sequence to the input and only keep the next word for the output
-            in_seq, out_seq = seq[:i], seq[i]
-
-            # apply padding and encode sequence
-            in_seq = pad_sequences(
-                [in_seq], maxlen=max_len, padding="post", truncating="post"
-            )[0]
-
-            # one hot encode output sequence
-            out_seq = to_categorical([out_seq], num_classes=x2_vocab_size)[0]
-            y.append(out_seq)
-
-            # cut the input seq to fixed length
-            x2.append(in_seq)
-
-    x1, x2, y = np.array(x1), np.array(x2), np.array(y)
-    return x1, x2, y, max_len
-
-
-"""
-This function can be used to debug the preprocessed dataset and print out
-encoded inputs as well as the label.
-Be aware of calling this function on a large dataset as it will produce dozens
-of print statemenets.
-"""
-
-
-def check_encoding(x1, x2, y, ast_idx2word, comment_idx2word):
-    print("--- Check Encoding ---")
-    for idx, ast in enumerate(x1):
-        x1_decoded = ""
-        x2_decoded = ""
-        y_decoded = ""
-
-        # decode one hot encoding for x1
-        for x1_encoded in ast:
-            x1_decoded += ast_idx2word[x1_encoded] + " "
-
-        # decode x2
-        for x2_encoded_num in reversed(x2[idx]):
-            if x2_encoded_num != 0:
-                x2_decoded = comment_idx2word[x2_encoded_num] + " " + x2_decoded
-
-        y_encoded = y[idx]
-        y_argmax = np.argmax(y_encoded)
-        if y_argmax != 0:
-            y_decoded = comment_idx2word[y_argmax]
-
-        print("X1", idx, x1_decoded)
-        print("X2", x2_decoded)
-        print("Y", y_decoded)
-        print("---")
-
-
 def save_tokenizer(tokenizer, file_path):
     with open(file_path, "wb") as handle:
         pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
         print("Tokenizer successfully saved ({})".format(file_path))
-
 
 def load_tokenizer(file_path):
     with open(file_path, "rb") as handle:
@@ -102,37 +21,76 @@ def load_tokenizer(file_path):
         print("Tokenizer loaded ({})".format(file_path))
         return tokenizer
 
+def get_encoder_decoder(model, lstm_layer_size):
+    encoder_inputs = model.input[0]   # input_1
+    encoder_outputs, state_h_enc, state_c_enc = model.layers[2].output   # lstm_1
+    encoder_states = [state_h_enc, state_c_enc]
+    encoder_model = Model(encoder_inputs, encoder_states)
 
-def evaluate(ast_in, ast_tokenizer, comment_tokenizer, max_seq_len, model):
-    result = "<start>"
+    decoder_inputs = model.input[1]   # input_2
+    decoder_state_input_h = Input(shape=(lstm_layer_size,), name='input_3')
+    decoder_state_input_c = Input(shape=(lstm_layer_size,), name='input_4')
+    decoder_states_inputs = [decoder_state_input_h, decoder_state_input_c]
+    decoder_lstm = model.layers[3]
+    decoder_outputs, state_h_dec, state_c_dec = decoder_lstm(
+        decoder_inputs, initial_state=decoder_states_inputs)
+    decoder_states = [state_h_dec, state_c_dec]
+    decoder_dense = model.layers[4]
+    decoder_outputs = decoder_dense(decoder_outputs)
+    decoder_model = Model(
+        [decoder_inputs] + decoder_states_inputs,
+        [decoder_outputs] + decoder_states)
 
-    signature_seq = ast_tokenizer.texts_to_sequences([ast_in])[0]
-    signature_seq = pad_sequences(
-        [signature_seq], maxlen=max_seq_len, padding="post", truncating="post"
-    )
-    signature_seq = np.array(signature_seq)
+    return (encoder_model, decoder_model)
 
-    for i in range(max_seq_len):
-        body_seq = comment_tokenizer.texts_to_sequences([result])[0]
-        body_seq = pad_sequences(
-            [body_seq], maxlen=max_seq_len, padding="post", truncating="post"
-        )
-        body_seq = np.array(body_seq)
+def decode_sequence(input_seq, encoder_model, decoder_model, comment_vocab_size, comment_tokenizer, max_comment_len):
+    # Encode the input as state vectors.
+    states_value = encoder_model.predict(input_seq)
 
-        # predict next token
-        y_hat = model.predict([signature_seq, body_seq], verbose=0)
-        y_hat = np.argmax(y_hat)
+    # Generate empty target sequence of length 1.
+    target_seq = np.zeros((1, 1, comment_vocab_size))
+    # Populate the first character of target sequence with the start character.
+    target_seq[0, 0, comment_tokenizer.word_index['<start>']] = 1.
 
-        # map idx to word
-        word = comment_tokenizer.index_word[y_hat]
+    # Sampling loop for a batch of sequences
+    # (to simplify, here we assume a batch of size 1).
+    stop_condition = False
+    decoded_comment = []
+    while not stop_condition:
+        output_tokens, h, c = decoder_model.predict(
+            [target_seq] + states_value)
 
-        # append as input for generating the next token
-        result += " " + word
+        # Sample a token
+        sampled_token_index = np.argmax(output_tokens[0, -1, :])
+        next_word = comment_tokenizer.index_word[sampled_token_index]
+        if next_word == '<eos>':
+            next_word = '\n'
+        yield(next_word)
 
-        if word is None or word == "<end>":
-            break
+        # Exit condition: either hit max length
+        # or find stop character.
+        if (next_word == '<end>' or
+           len(decoded_comment) > max_comment_len):
+            stop_condition = True
 
-    return result
+        # Update the target sequence (of length 1).
+        target_seq = np.zeros((1, 1, comment_vocab_size))
+        target_seq[0, 0, sampled_token_index] = 1.
+
+        # Update states
+        states_value = [h, c]
+
+def predict_comment(ast_in, ast_tokenizer, comment_tokenizer, max_ast_len, max_comment_len, model, ast_vocab_size, comment_vocab_size, lstm_layer_size):
+    encoder_model, decoder_model = get_encoder_decoder(model, lstm_layer_size)
+    input_asts = ast_tokenizer.texts_to_sequences([ast_in])
+    encoder_input_data = np.zeros(
+        (len(input_asts), max_ast_len, ast_vocab_size),
+        dtype='float32')
+    for i, input_text in enumerate(input_asts):
+        for t, token in enumerate(input_text):
+            encoder_input_data[i, t, token] = 1.
+    result = decode_sequence(encoder_input_data, encoder_model, decoder_model, comment_vocab_size, comment_tokenizer, max_comment_len)
+    return ' '.join(list(result))
 
 class ConditionalScope:
     def __init__(self, scope_factory, enabled = True):

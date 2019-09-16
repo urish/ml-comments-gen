@@ -3,12 +3,8 @@ import sys
 from argparse import ArgumentParser
 from os import path
 
-import numpy as np
-import tensorflow as tf
-
 from tensorflow.keras.models import load_model
-from utils import load_tokenizer, evaluate
-from parameters import UNITS, EMBEDDING_DIM
+from utils import load_tokenizer, predict_comment
 
 parser = ArgumentParser()
 
@@ -35,8 +31,6 @@ with open(path.join(run_dir, "params.pickle"), "rb") as f:
 
 print(params)
 
-max_seq_len = params.get("max_seq_len")
-
 model_file = path.join(run_dir, "model.h5")
 model = load_model(model_file)
 print("Model '{}' loaded.".format(model_file))
@@ -52,7 +46,7 @@ if not path.exists(comment_tokenizer_file):
 
 ast_tokenizer = load_tokenizer(ast_tokenizer_file)
 comment_tokenizer = load_tokenizer(comment_tokenizer_file)
-
+  
 if __name__ == "__main__":
     ast_in = "FunctionDeclaration ( SyntaxList ( ExportKeyword ) FunctionKeyword Identifier OpenParenToken SyntaxList ( Parameter ( Identifier ColonToken TypeReference ( Identifier ) ) ) CloseParenToken Block ( OpenBraceToken SyntaxList ( ReturnStatement ( ReturnKeyword NewExpression ( NewKeyword Identifier OpenParenToken SyntaxList ( Identifier ) CloseParenToken ) SemicolonToken ) ) CloseBraceToken )"
 
@@ -60,13 +54,16 @@ if __name__ == "__main__":
 
     print("Using run from '{}'\n".format(run_dir))
 
-    result = evaluate(
-        ast_in,
-        ast_tokenizer=ast_tokenizer,
-        comment_tokenizer=comment_tokenizer,
-        max_seq_len=max_seq_len,
-        model=model,
-    )
+    max_ast_len = params.get('max_ast_len')
+    max_comment_len = params.get('max_comment_len')
+    ast_vocab_size = params.get('ast_vocab_size')
+    comment_vocab_size = params.get('comment_vocab_size')
+    lstm_layer_size = params.get('lstm_layer_size')
 
+    model = load_model(path.join(run_dir, 'model.h5'))
+    result = predict_comment(
+        ast_in, ast_tokenizer, comment_tokenizer, max_ast_len, max_comment_len, 
+        model, ast_vocab_size, comment_vocab_size, lstm_layer_size
+    )
     print("AST: {}\n".format(ast_in))
     print("Predicted Comment: {}".format(result))

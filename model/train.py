@@ -11,7 +11,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (Input, Embedding, LSTM, Dense)
 
-from utils import ConditionalScope, save_tokenizer
+from utils import ConditionalScope, save_tokenizer, predict_comment
 from parameters import EMBEDDING_DIM, MAX_AST_LEN, MAX_COMMENT_LEN, UNITS, VOCAB_SIZE, LSTM_LAYER_SIZE
 
 boolean = lambda x: (str(x).lower() == "true")
@@ -215,12 +215,9 @@ with ConditionalScope(create_tpu_scope, tpu):
 
     ast_in = np.random.choice(asts.values, 1)[0]
 
-    result = evaluate(
-        ast_in,
-        ast_tokenizer=ast_tokenizer,
-        comment_tokenizer=comment_tokenizer,
-        max_seq_len=max_seq_len,
-        model=model,
+    result = predict_comment(
+        ast_in, ast_tokenizer, comment_tokenizer, MAX_AST_LEN, MAX_COMMENT_LEN, 
+        model, ast_vocab_size, comment_vocab_size, LSTM_LAYER_SIZE
     )
 
     print("Input: %s\n" % (ast_in))
