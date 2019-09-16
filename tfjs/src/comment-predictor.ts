@@ -67,10 +67,11 @@ export class CommentPredictor {
         targetSeq,
         ...statesValues
       ]) as tf.Tensor[];
-    
+
       // Sample a token
       const sampled_token_index = (outputTokens.argMax(2).arraySync() as number[][])[0][0];
       const next_word = commentTokens[sampled_token_index as number];
+
       if (next_word == '<end>') {
         return;
       }
@@ -81,7 +82,7 @@ export class CommentPredictor {
         yield next_word;
       }
 
-      tf.oneHot([sampled_token_index], comment_vocab_size).expandDims();
+      targetSeq = tf.oneHot([sampled_token_index], comment_vocab_size).expandDims();
       statesValues = [h, c];
     }
   }

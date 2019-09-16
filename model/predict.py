@@ -46,7 +46,7 @@ if not path.exists(comment_tokenizer_file):
 
 ast_tokenizer = load_tokenizer(ast_tokenizer_file)
 comment_tokenizer = load_tokenizer(comment_tokenizer_file)
-  
+
 if __name__ == "__main__":
     ast_in = "FunctionDeclaration ( SyntaxList ( ExportKeyword ) FunctionKeyword Identifier OpenParenToken SyntaxList ( Parameter ( Identifier ColonToken TypeReference ( Identifier ) ) ) CloseParenToken Block ( OpenBraceToken SyntaxList ( ReturnStatement ( ReturnKeyword NewExpression ( NewKeyword Identifier OpenParenToken SyntaxList ( Identifier ) CloseParenToken ) SemicolonToken ) ) CloseBraceToken )"
 
@@ -54,16 +54,23 @@ if __name__ == "__main__":
 
     print("Using run from '{}'\n".format(run_dir))
 
-    max_ast_len = params.get('max_ast_len')
-    max_comment_len = params.get('max_comment_len')
-    ast_vocab_size = params.get('ast_vocab_size')
-    comment_vocab_size = params.get('comment_vocab_size')
-    lstm_layer_size = params.get('lstm_layer_size')
+    max_ast_len = params.get("max_ast_len")
+    max_comment_len = params.get("max_comment_len")
+    ast_vocab_size = params.get("ast_vocab_size")
+    comment_vocab_size = params.get("comment_vocab_size")
+    lstm_layer_size = params.get("lstm_layer_size")
 
-    model = load_model(path.join(run_dir, 'model.h5'))
     result = predict_comment(
-        ast_in, ast_tokenizer, comment_tokenizer, max_ast_len, max_comment_len, 
-        model, ast_vocab_size, comment_vocab_size, lstm_layer_size
+        ast_in,
+        ast_tokenizer,
+        comment_tokenizer,
+        max_ast_len,
+        max_comment_len,
+        model,
+        ast_vocab_size,
+        comment_vocab_size,
+        lstm_layer_size,
     )
+
     print("AST: {}\n".format(ast_in))
     print("Predicted Comment: {}".format(result))

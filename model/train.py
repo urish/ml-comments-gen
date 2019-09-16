@@ -9,10 +9,18 @@ import tensorflow as tf
 
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import (Input, Embedding, LSTM, Dense)
+from tensorflow.keras.layers import Input, Embedding, LSTM, Dense
 
 from utils import ConditionalScope, save_tokenizer, predict_comment
-from parameters import EMBEDDING_DIM, MAX_AST_LEN, MAX_COMMENT_LEN, UNITS, VOCAB_SIZE, LSTM_LAYER_SIZE
+
+from parameters import (
+    EMBEDDING_DIM,
+    MAX_AST_LEN,
+    MAX_COMMENT_LEN,
+    UNITS,
+    VOCAB_SIZE,
+    LSTM_LAYER_SIZE,
+)
 
 boolean = lambda x: (str(x).lower() == "true")
 
@@ -57,12 +65,14 @@ if not path.exists(run_dir):
         )
     )
 
+
 def create_tokenizer(name, num_words=None):
     print("Creating tokenizer for '{}'".format(name))
     print("Using num_words={}".format(num_words))
     return tf.keras.preprocessing.text.Tokenizer(
         filters="", split=" ", lower=False, oov_token="UNK", num_words=num_words
     )
+
 
 df = pd.read_csv(dataset_path)
 n_observations = df.shape[0]
@@ -78,8 +88,10 @@ comment_tokenizer.fit_on_texts(comments)
 ast_tokenizer = create_tokenizer("ASTs")
 ast_tokenizer.fit_on_texts(asts)
 
-ast_vocab_size = len(ast_tokenizer.word_index) + 1
-comment_vocab_size = len(comment_tokenizer.word_index) + 1
+# we add two to account for padding and an eof token
+ast_vocab_size = len(ast_tokenizer.word_index) + 2
+comment_vocab_size = VOCAB_SIZE + 2
+
 print("Vocabulary size: ast={}, comments={}".format(ast_vocab_size, comment_vocab_size))
 
 # translate each word to the matching vocabulary index
@@ -87,33 +99,41 @@ ast_sequences = ast_tokenizer.texts_to_sequences(asts)
 comment_sequences = comment_tokenizer.texts_to_sequences(comments)
 
 encoder_input_data = np.zeros(
-    (len(ast_sequences), MAX_AST_LEN, ast_vocab_size),
-    dtype='float32')
-decoder_input_data = np.zeros(
-    (len(comment_sequences), MAX_COMMENT_LEN, comment_vocab_size),
-    dtype='float32')
-decoder_target_data = np.zeros(
-    (len(comment_sequences), MAX_COMMENT_LEN, comment_vocab_size),
-    dtype='float32')
+    (len(ast_sequences), MAX_AST_LEN, ast_vocab_size), dtype="float32"
+)
 
-ast_eof_token = 1
-comment_eof_token = 1
+decoder_input_data = np.zeros(
+    (len(comment_sequences), MAX_COMMENT_LEN, comment_vocab_size), dtype="float32"
+)
+
+decoder_target_data = np.zeros(
+    (len(comment_sequences), MAX_COMMENT_LEN, comment_vocab_size), dtype="float32"
+)
+
+ast_eof_token = ast_vocab_size - 1
+comment_eof_token = comment_vocab_size - 1
 
 for i, (input_text, target_text) in enumerate(zip(ast_sequences, comment_sequences)):
     for t, token in enumerate(input_text):
-        encoder_input_data[i, t, token] = 1.
-    encoder_input_data[i, t + 1:, ast_eof_token] = 1.
+        encoder_input_data[i, t, token] = 1.0
+
+    encoder_input_data[i, t + 1 :, ast_eof_token] = 1.0
+
     for t, token in enumerate(target_text):
         if t >= MAX_COMMENT_LEN:
-          continue
+            continue
+
         # decoder_target_data is ahead of decoder_input_data by one timestep
-        decoder_input_data[i, t, token] = 1.
+        decoder_input_data[i, t, token] = 1.0
+
         if t > 0:
             # decoder_target_data will be ahead by one timestep
             # and will not include the start character.
-            decoder_target_data[i, t - 1, token] = 1.
-    decoder_input_data[i, t + 1:, comment_eof_token] = 1.
-    decoder_target_data[i, t:, comment_eof_token] = 1.
+            decoder_target_data[i, t - 1, token] = 1.0
+
+    decoder_input_data[i, t + 1 :, comment_eof_token] = 1.0
+    decoder_target_data[i, t:, comment_eof_token] = 1.0
+
 
 def create_tpu_scope():
     resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
@@ -121,6 +141,7 @@ def create_tpu_scope():
     tf.tpu.experimental.initialize_tpu_system(resolver)
     strategy = tf.distribute.experimental.TPUStrategy(resolver)
     return strategy.scope()
+
 
 # Model code based on https://keras.io/examples/lstm_seq2seq/
 
@@ -138,9 +159,8 @@ with ConditionalScope(create_tpu_scope, tpu):
     # and to return internal states as well. We don't use the
     # return states in the training model, but we will use them in inference.
     decoder_lstm = LSTM(LSTM_LAYER_SIZE, return_sequences=True, return_state=True)
-    decoder_outputs, _, _ = decoder_lstm(decoder_inputs,
-                                        initial_state=encoder_states)
-    decoder_dense = Dense(comment_vocab_size, activation='softmax')
+    decoder_outputs, _, _ = decoder_lstm(decoder_inputs, initial_state=encoder_states)
+    decoder_dense = Dense(comment_vocab_size, activation="softmax")
     decoder_outputs = decoder_dense(decoder_outputs)
 
     # Define the model that will turn
@@ -148,20 +168,27 @@ with ConditionalScope(create_tpu_scope, tpu):
     model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
 
     # Run training
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy',
-                  metrics=['accuracy'])
+    model.compile(
+        optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"]
+    )
 
     # auto-save weights
-    checkpoint_home = 'gs://ml-comments-gen/runs/{}'.format(run) if tpu else run_dir
-    checkpoint_path = path.join(checkpoint_home, 'checkpoints/cp-{epoch:05d}.ckpt')
+    checkpoint_home = "gs://ml-comments-gen/runs/{}".format(run) if tpu else run_dir
+    checkpoint_path = path.join(checkpoint_home, "checkpoints/cp-{epoch:05d}.ckpt")
     latest_checkpoint = tf.train.latest_checkpoint(path.dirname(checkpoint_path))
 
-    cp_callback = ModelCheckpoint(checkpoint_path, verbose=1, save_weights_only=True, period=5)
+    cp_callback = ModelCheckpoint(
+        checkpoint_path, verbose=1, save_weights_only=True, period=5
+    )
 
     if latest_checkpoint:
         model.load_weights(latest_checkpoint)
-        initial_epoch = int(path.splitext(latest_checkpoint)[0].split('cp-')[1])
-        print("Restored model from checkpoint {}, epoch {}".format(latest_checkpoint, initial_epoch))
+        initial_epoch = int(path.splitext(latest_checkpoint)[0].split("cp-")[1])
+        print(
+            "Restored model from checkpoint {}, epoch {}".format(
+                latest_checkpoint, initial_epoch
+            )
+        )
     else:
         initial_epoch = 0
         model.save_weights(checkpoint_path.format(epoch=0))
@@ -171,14 +198,14 @@ with ConditionalScope(create_tpu_scope, tpu):
 
     print("Buckle up and hold tight! We are about to start the training...")
     model.fit(
-        [encoder_input_data, decoder_input_data], 
+        [encoder_input_data, decoder_input_data],
         decoder_target_data,
         epochs=epochs,
         initial_epoch=initial_epoch,
         batch_size=batch_size,
         callbacks=[
-            cp_callback, 
-            #tensorboard
+            cp_callback,
+            # tensorboard
         ],
         #  steps_per_epoch=3,
     )
@@ -216,8 +243,15 @@ with ConditionalScope(create_tpu_scope, tpu):
     ast_in = np.random.choice(asts.values, 1)[0]
 
     result = predict_comment(
-        ast_in, ast_tokenizer, comment_tokenizer, MAX_AST_LEN, MAX_COMMENT_LEN, 
-        model, ast_vocab_size, comment_vocab_size, LSTM_LAYER_SIZE
+        ast_in,
+        ast_tokenizer,
+        comment_tokenizer,
+        MAX_AST_LEN,
+        MAX_COMMENT_LEN,
+        model,
+        ast_vocab_size,
+        comment_vocab_size,
+        LSTM_LAYER_SIZE,
     )
 
     print("Input: %s\n" % (ast_in))

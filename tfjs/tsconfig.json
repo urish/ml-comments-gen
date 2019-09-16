@@ -7,7 +7,7 @@
     "removeComments": false,
     "declaration": true,
     "noEmitOnError": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "noImplicitThis": true,
     "noImplicitAny": true,
     "noFallthroughCasesInSwitch": true,

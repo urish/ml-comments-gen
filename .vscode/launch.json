@@ -18,7 +18,7 @@
     {
       "id": "run",
       "type": "promptString",
-      "default": "500",
+      "default": "1",
       "description": "Run you wish to execute"
     }
   ]

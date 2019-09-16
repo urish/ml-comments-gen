@@ -6,13 +6,12 @@ import json
 
 from tensorflow.keras.models import load_model
 import tensorflowjs as tfjs
-from utils import load_tokenizer, evaluate
+from utils import load_tokenizer
 from parameters import UNITS, EMBEDDING_DIM
 
 parser = ArgumentParser()
 
 parser.add_argument("-r", "--run", type=str)
-parser.add_argument("--ast", type=str, const=True, nargs="?")
 
 args = parser.parse_args()
 
@@ -22,7 +21,7 @@ if not args.run:
 run = args.run
 
 run_dir = "../runs/{}".format(run)
-jsmodel_dir = path.join(run_dir, 'tfjsmodel')
+jsmodel_dir = path.join(run_dir, "tfjsmodel")
 
 if not path.exists(run_dir):
     sys.exit(
@@ -51,11 +50,14 @@ comment_tokenizer = load_tokenizer(comment_tokenizer_file)
 
 tfjs.converters.save_keras_model(model, jsmodel_dir)
 
-with open(path.join(jsmodel_dir, 'tokenizers.json'), 'w') as outfile:
-    json.dump({
-        "params": params,
-        "ast": ast_tokenizer.word_index,
-        "comments": comment_tokenizer.index_word,
-    }, outfile)
+with open(path.join(jsmodel_dir, "tokenizers.json"), "w") as outfile:
+    json.dump(
+        {
+            "params": params,
+            "ast": ast_tokenizer.word_index,
+            "comments": comment_tokenizer.index_word,
+        },
+        outfile,
+    )
 
 print("Model successfully exported")
