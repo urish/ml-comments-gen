@@ -63,7 +63,7 @@ def decode_sequence(input_seq, encoder_model, decoder_model, comment_vocab_size,
         # Sample a token
         sampled_token_index = np.argmax(output_tokens[0, -1, :])
         next_word = comment_tokenizer.index_word[sampled_token_index]
-        if next_word == '<eos>':
+        if next_word in ['<eol>', '<eos>']:
             next_word = '\n'
         yield(next_word)
 
