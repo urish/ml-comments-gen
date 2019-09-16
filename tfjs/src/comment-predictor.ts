@@ -30,7 +30,7 @@ export class CommentPredictor {
     const decoder_states_inputs = [decoder_state_input_h, decoder_state_input_c];
     const decoder_lstm = model.layers[3];
     const [decoder_lstm_outputs, state_h_dec, state_c_dec] = decoder_lstm.apply(decoder_inputs, {
-      initial_state: decoder_states_inputs
+      initialState: decoder_states_inputs
     }) as tf.SymbolicTensor[];
     const decoder_states = [state_h_dec, state_c_dec];
     const decoder_dense = model.layers[4];
