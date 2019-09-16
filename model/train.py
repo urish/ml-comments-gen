@@ -12,7 +12,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (Input, Embedding, LSTM, Dense)
 
 from utils import ConditionalScope, save_tokenizer
-from parameters import EMBEDDING_DIM, MAX_AST_LEN, MAX_COMMENT_LEN, UNITS, VOCAB_SIZE, LTSM_LAYER_SIZE
+from parameters import EMBEDDING_DIM, MAX_AST_LEN, MAX_COMMENT_LEN, UNITS, VOCAB_SIZE, LSTM_LAYER_SIZE
 
 boolean = lambda x: (str(x).lower() == "true")
 
@@ -127,7 +127,7 @@ def create_tpu_scope():
 with ConditionalScope(create_tpu_scope, tpu):
     # Define an input sequence and process it.
     encoder_inputs = Input(shape=(None, ast_vocab_size))
-    encoder = LSTM(LTSM_LAYER_SIZE, return_state=True)
+    encoder = LSTM(LSTM_LAYER_SIZE, return_state=True)
     encoder_outputs, state_h, state_c = encoder(encoder_inputs)
     # We discard `encoder_outputs` and only keep the states.
     encoder_states = [state_h, state_c]
@@ -137,7 +137,7 @@ with ConditionalScope(create_tpu_scope, tpu):
     # We set up our decoder to return full output sequences,
     # and to return internal states as well. We don't use the
     # return states in the training model, but we will use them in inference.
-    decoder_lstm = LSTM(LTSM_LAYER_SIZE, return_sequences=True, return_state=True)
+    decoder_lstm = LSTM(LSTM_LAYER_SIZE, return_sequences=True, return_state=True)
     decoder_outputs, _, _ = decoder_lstm(decoder_inputs,
                                         initial_state=encoder_states)
     decoder_dense = Dense(comment_vocab_size, activation='softmax')
@@ -196,7 +196,7 @@ with ConditionalScope(create_tpu_scope, tpu):
         "max_ast_len": MAX_AST_LEN,
         "max_comment_len": MAX_COMMENT_LEN,
         "ast_vocab_size": ast_vocab_size,
-        "lstm_size": LTSM_LAYER_SIZE,
+        "lstm_size": LSTM_LAYER_SIZE,
         "comment_vocab_size": comment_vocab_size,
         "batch_size": batch_size,
     }
