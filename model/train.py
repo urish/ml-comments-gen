@@ -45,6 +45,10 @@ parser.add_argument("-d", "--debug", nargs="?", type=boolean, const=True, defaul
 
 parser.add_argument("-tpu", nargs="?", type=boolean, const=True, default=False)
 
+parser.add_argument("-c", "--checkpoints", nargs="?", type=boolean, const=True, default=True)
+
+parser.add_argument("-tb", "--tensorboard", nargs="?", type=boolean, const=True, default=False)
+
 args = parser.parse_args()
 
 if not args.run:
@@ -57,6 +61,8 @@ tpu = args.tpu
 batch_size = args.batch_size
 epochs = args.epochs
 word_vectors = args.word_vectors
+checkpoints = args.checkpoints
+tensorboard = args.tensorboard
 
 run_dir = "../runs/{}".format(run)
 dataset_path = path.join(run_dir, "dataset_clean.csv")
@@ -176,29 +182,34 @@ with ConditionalScope(create_tpu_scope, tpu):
         optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"]
     )
 
+    fit_callbacks = []
+
     # auto-save weights
-    checkpoint_home = "gs://ml-comments-gen/runs/{}".format(run) if tpu else run_dir
-    checkpoint_path = path.join(checkpoint_home, "checkpoints/cp-{epoch:05d}.ckpt")
-    latest_checkpoint = tf.train.latest_checkpoint(path.dirname(checkpoint_path))
+    initial_epoch = 0
 
-    cp_callback = ModelCheckpoint(
-        checkpoint_path, verbose=1, save_weights_only=True, period=5
-    )
+    if checkpoints:
+        checkpoint_home = "gs://ml-comments-gen/runs/{}".format(run) if tpu else run_dir
+        checkpoint_path = path.join(checkpoint_home, "checkpoints/cp-{epoch:05d}.ckpt")
+        latest_checkpoint = tf.train.latest_checkpoint(path.dirname(checkpoint_path))
 
-    if latest_checkpoint:
-        model.load_weights(latest_checkpoint)
-        initial_epoch = int(path.splitext(latest_checkpoint)[0].split("cp-")[1])
-        print(
-            "Restored model from checkpoint {}, epoch {}".format(
-                latest_checkpoint, initial_epoch
+        fit_callbacks.append(ModelCheckpoint(
+            checkpoint_path, verbose=1, save_weights_only=True, period=5
+        ))
+
+        if latest_checkpoint:
+            model.load_weights(latest_checkpoint)
+            initial_epoch = int(path.splitext(latest_checkpoint)[0].split("cp-")[1])
+            print(
+                "Restored model from checkpoint {}, epoch {}".format(
+                    latest_checkpoint, initial_epoch
+                )
             )
-        )
-    else:
-        initial_epoch = 0
-        model.save_weights(checkpoint_path.format(epoch=0))
+        else:
+            model.save_weights(checkpoint_path.format(epoch=0))
 
     # Tensorboard logs
-    tensorboard = TensorBoard(log_dir=run_dir)
+    if tensorboard:
+        fit_callbacks.append(TensorBoard(log_dir=run_dir))
 
     print("Buckle up and hold tight! We are about to start the training...")
     history = model.fit(
@@ -207,10 +218,7 @@ with ConditionalScope(create_tpu_scope, tpu):
         epochs=epochs,
         initial_epoch=initial_epoch,
         batch_size=batch_size,
-        callbacks=[
-            cp_callback,
-            # tensorboard
-        ],
+        callbacks=fit_callbacks,
         #  steps_per_epoch=3,
     )
 
