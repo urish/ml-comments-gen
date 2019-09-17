@@ -1,17 +1,35 @@
 {
-  "name": "tfjs",
+  "name": "ts-comment-predictor",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "license": "MIT",
+  "description": "Predict comment based on function body (experimental)",
+  "repository": "https://github.com/urish/ml-comments-gen",
+  "author": "Uri Shaked <uri@codemagic.co.il>",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "start": "ts-node src/main.ts"
+    "build": "tsc",
+    "prepare-dataset": "ts-node src/prepare-dataset.ts",
+    "predict": "ts-node src/predict-main.ts",
+    "test": "jest",
+    "prepare": "tsc"
   },
   "devDependencies": {
-    "@types/node": "^12.7.5",
-    "ts-node": "^8.3.0",
-    "typescript": "^3.6.3"
+    "@types/jest": "^24.0.17",
+    "chalk": "^2.4.2",
+    "jest": "^24.9.0",
+    "ts-jest": "^24.0.2",
+    "ts-node": "^8.3.0"
   },
   "dependencies": {
-    "@tensorflow/tfjs-node": "^1.2.9"
+    "@types/node": "^12.7.5",
+    "@phenomnomnominal/tsquery": "^3.0.0",
+    "@tensorflow/tfjs-node": "^1.2.9",
+    "array-flat-polyfill": "^1.0.1",
+    "striptags": "^3.1.1",
+    "typescript": "^3.6.3"
   }
 }

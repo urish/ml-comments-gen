@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "outDir": "dist",
     "target": "es2018",
     "module": "commonjs",
     "moduleResolution": "node",
@@ -11,6 +12,7 @@
     "noImplicitThis": true,
     "noImplicitAny": true,
     "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
     "lib": ["es2018", "esnext.array"]
   }
 }

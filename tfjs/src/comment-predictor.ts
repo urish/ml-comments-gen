@@ -1,5 +1,5 @@
 import * as tf from '@tensorflow/tfjs-node';
-import { dumpAst } from '../../prepare/src/dump-ast';
+import { dumpAst } from './dump-ast';
 
 export interface ITokenizersJson {
   params: {

@@ -2,7 +2,7 @@ import * as tf from '@tensorflow/tfjs-node';
 import * as path from 'path';
 import { ITokenizersJson, CommentPredictor } from './comment-predictor';
 
-const modelDir = path.resolve('../runs/1/tfjsmodel');
+const modelDir = path.resolve('../runs/js-500/tfjsmodel');
 const modelFile = path.join(modelDir, 'model.json');
 const tokenizers: ITokenizersJson = require(path.join(modelDir, 'tokenizers.json'));
 const testFn = 'function printSum(a:number,b:number) { console.log(a + b); }';

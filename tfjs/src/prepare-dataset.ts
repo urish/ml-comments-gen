@@ -14,7 +14,7 @@ const input = createReadStream(join(__dirname, '../../data/typescript-all-functi
 const datasetPath = join(__dirname, '../../data/dataset.json');
 const metadataPath = join(__dirname, '../../data/metadata.txt');
 const NEW_LINE = '\r\n';
-const N_OBSERVATIONS = 1;
+const N_OBSERVATIONS = 100;
 const MAX_COMMENT_LENGTH = 200;
 const MAX_AST_LENGTH = 500;
 
