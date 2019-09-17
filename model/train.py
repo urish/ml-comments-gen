@@ -3,6 +3,7 @@ import sys
 from argparse import ArgumentParser
 from os import path
 import json
+from itertools import chain
 
 import numpy as np
 import pandas as pd
@@ -85,7 +86,8 @@ asts = df["ast"]
 comments = df["comments"]
 
 comment_tokenizer = create_tokenizer("Comments", VOCAB_SIZE)
-comment_tokenizer.fit_on_texts(comments)
+fallback_tokens = fallback_tokenizer_dictionary()
+comment_tokenizer.fit_on_texts(chain(fallback_tokens * len(comments), comments))
 
 ast_tokenizer = create_tokenizer("ASTs")
 ast_tokenizer.fit_on_texts(asts)
@@ -98,7 +100,7 @@ print("Vocabulary size: ast={}, comments={}".format(ast_vocab_size, comment_voca
 
 # translate each word to the matching vocabulary index
 ast_sequences = ast_tokenizer.texts_to_sequences(asts)
-comment_sequences = comment_tokenizer.texts_to_sequences(comments)
+comment_sequences = tokenize_with_fallback(comment_tokenizer, comments, VOCAB_SIZE)
 
 encoder_input_data = np.zeros(
     (len(ast_sequences), MAX_AST_LEN, ast_vocab_size), dtype="float32"

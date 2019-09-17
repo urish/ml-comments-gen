@@ -70,24 +70,26 @@ def decode_sequence(
 
     # Sampling loop for a batch of sequences
     # (to simplify, here we assume a batch of size 1).
-    stop_condition = False
-    decoded_comment = []
-    while not stop_condition:
+    prev_word = ''
+    for i in range(max_comment_len):
         output_tokens, h, c = decoder_model.predict([target_seq] + states_value)
 
         # Sample a token
         sampled_token_index = np.argmax(output_tokens[0, -1, :])
         next_word = comment_tokenizer.index_word[sampled_token_index]
 
-        if next_word in ["<eol>", "<eos>"]:
-            next_word = "\n"
-
-        yield (next_word)
-
-        # Exit condition: either hit max length
-        # or find stop character.
-        if next_word == "<end>" or len(decoded_comment) > max_comment_len:
-            stop_condition = True
+        space = (' ' if prev_word != '' else '')
+        if next_word == "<end>":
+            break
+        elif next_word in ["<eol>", "<eos>"]:
+            yield "\n"
+        elif next_word[0] == '<':
+            if prev_word[0] == '<':
+                space = ''
+            yield space + next_word[1]
+        else:
+            yield space + next_word
+        prev_word = next_word
 
         # Update the target sequence (of length 1).
         target_seq = np.zeros((1, 1, comment_vocab_size))
@@ -127,7 +129,7 @@ def predict_comment(
         comment_tokenizer,
         max_comment_len,
     )
-    return " ".join(list(result))
+    return "".join(list(result))
 
 
 class ConditionalScope:
