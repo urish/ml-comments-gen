@@ -83,8 +83,8 @@ def decode_sequence(
             break
         elif next_word in ["<eol>", "<eos>"]:
             yield "\n"
-        elif next_word[0] == '<':
-            if prev_word[0] == '<':
+        elif next_word[0] == '>':
+            if prev_word[0] == '>':
                 space = ''
             yield space + next_word[1]
         else:
