@@ -2,6 +2,7 @@ import pickle
 import sys
 from argparse import ArgumentParser
 from os import path
+import json
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Embedding, LSTM, Dense
 
 from utils import ConditionalScope, save_tokenizer, predict_comment
+from tokenize_fallback import fallback_tokenizer_dictionary, tokenize_with_fallback
 
 from parameters import (
     EMBEDDING_DIM,
@@ -197,7 +199,7 @@ with ConditionalScope(create_tpu_scope, tpu):
     tensorboard = TensorBoard(log_dir=run_dir)
 
     print("Buckle up and hold tight! We are about to start the training...")
-    model.fit(
+    history = model.fit(
         [encoder_input_data, decoder_input_data],
         decoder_target_data,
         epochs=epochs,
@@ -234,6 +236,15 @@ with ConditionalScope(create_tpu_scope, tpu):
     with open(params_path, "wb") as f:
         pickle.dump(params, f)
         print("\nParams successfully saved ({})".format(params_path))
+
+    # Save training history report
+    history_path = path.join(run_dir, "training.json")
+    with open(history_path, "w") as f:
+        json.dump({
+            "history": [
+                {"epoch": epoch, "loss": loss.item(), "acc": acc.item()} for (epoch, loss, acc) in zip(history.epoch, history.history['loss'], history.history['acc'])
+            ]
+        }, f, indent=2)
 
     print("------------------------------")
     print("|           TEST             |")
