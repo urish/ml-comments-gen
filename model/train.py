@@ -49,6 +49,8 @@ parser.add_argument("-c", "--checkpoints", nargs="?", type=boolean, const=True, 
 
 parser.add_argument("-tb", "--tensorboard", nargs="?", type=boolean, const=True, default=False)
 
+parser.add_argument("--steps-per-epoch", nargs="?", type=int, const=True)
+
 args = parser.parse_args()
 
 if not args.run:
@@ -63,6 +65,7 @@ epochs = args.epochs
 word_vectors = args.word_vectors
 checkpoints = args.checkpoints
 tensorboard = args.tensorboard
+steps_per_epoch = args.steps_per_epoch
 
 run_dir = "../runs/{}".format(run)
 dataset_path = path.join(run_dir, "dataset_clean.csv")
@@ -219,7 +222,7 @@ with ConditionalScope(create_tpu_scope, tpu):
         initial_epoch=initial_epoch,
         batch_size=batch_size,
         callbacks=fit_callbacks,
-        #  steps_per_epoch=3,
+        steps_per_epoch=steps_per_epoch,
     )
 
     # save model
