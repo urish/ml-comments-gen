@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 import { isSupportedLanguage, getNodeAtFileOffset, findParentFunction } from './utils';
 import { createSourceFile, ScriptTarget } from 'typescript';
-import { CommentPredictorStub } from './comment-predictor-stub';
+import { loadModel, CommentPredictor } from 'ts-comment-predictor';
+
+let predictorPromise: Promise<CommentPredictor>;
 
 function getEditor(): vscode.TextEditor | null {
   const editor = vscode.window.activeTextEditor;
@@ -24,14 +26,20 @@ async function addCommentCommand() {
   if (parentFunction) {
     const startPos = editor.document.positionAt(parentFunction.getStart());
     const indent = ' '.repeat(startPos.character);
-    const cp = new CommentPredictorStub();
+    const predictor = await predictorPromise;
     await editor.edit((editBuilder) => {
       editBuilder.insert(startPos, '/* */\n' + indent);
     });
-    let currentPos = new vscode.Position(startPos.line, startPos.character + 3);
-    for (let token of cp.predict(parentFunction.getText())) {
-      if (token === '/* ' || token === '*/ ') {
+    let currentPos = new vscode.Position(startPos.line, startPos.character + 1);
+    for (let token of predictor.predict(parentFunction.getText())) {
+      if (token.startsWith('*/')) {
         continue;
+      }
+      if (token.startsWith('/*')) {
+        token = token.substr(2);
+        if (!token.trim()) {
+          continue;
+        }
       }
       if (token[0] === '\n') {
         token += indent;
@@ -51,6 +59,9 @@ async function addCommentCommand() {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
+  predictorPromise = loadModel('C:/p/ml-comments-gen/runs/js-500/tfjsmodel').then(
+    ({ model, tokenizers }) => new CommentPredictor(model, tokenizers),
+  );
   context.subscriptions.push(...[vscode.commands.registerCommand('extension.articulate', addCommentCommand)]);
 }
 

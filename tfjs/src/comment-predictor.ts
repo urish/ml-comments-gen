@@ -71,6 +71,7 @@ export class CommentPredictor {
 
     // Populate the first character of target sequence with the start character.
     let targetSeq = tf.oneHot([startToken], comment_vocab_size).expandDims();
+    let firstInLine = true;
     for (let i = 0; i < max_comment_len; i++) {
       const [outputTokens, h, c] = this.decoderModel.predict([
         targetSeq,
@@ -87,8 +88,11 @@ export class CommentPredictor {
 
       if (next_word == '<eol>' || next_word === '<eos>') {
         yield '\n';
+        firstInLine = true;
       } else {
-        yield next_word;
+        const space = firstInLine ? '' : ' ';
+        yield space + next_word;
+        firstInLine = false;
       }
 
       targetSeq = tf.oneHot([sampled_token_index], comment_vocab_size).expandDims();

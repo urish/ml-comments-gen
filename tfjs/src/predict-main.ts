@@ -18,7 +18,7 @@ async function main() {
     predictedComment.push(token);
   }
 
-  return predictedComment.join(' ');
+  return predictedComment.join('');
 }
 
 main()
