@@ -7,9 +7,9 @@ import { cleanJsDoc } from './clean-jsdoc';
 import { dumpAst } from './dump-ast';
 import { renameArgsInComments } from './rename-args-in-comments';
 
-const input = createReadStream(join(__dirname, '../../data/typescript-all-functions-100-stars.json.gz')).pipe(
-  createGunzip(),
-);
+const input = createReadStream(
+  join(__dirname, '../../data/typescript-all-functions-100-stars.json.gz')
+).pipe(createGunzip());
 
 const datasetPath = join(__dirname, '../../data/dataset.json');
 const metadataPath = join(__dirname, '../../data/metadata.txt');
@@ -45,7 +45,7 @@ function prepareEntry(input: IInputRecord) {
     character,
     code: input.text,
     comments: renameArgsInComments(cleanJsDoc(input.comments), input.text),
-    ast: dumpAst(input.text, true),
+    ast: dumpAst(input.text, true)
   };
 }
 

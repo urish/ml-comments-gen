@@ -34,6 +34,11 @@ def round_down(num):
     return floor(num / divisor) * divisor
 
 
+def splitForwardSlashes(match):
+    slashes = list(match.group(0))
+    return " ".join(slashes)
+
+
 def clean_token(text):
     # normalize
     text = text.lower()
@@ -44,11 +49,14 @@ def clean_token(text):
     # custom splitting rule to create space around special code characters
     text = re.sub(r"([.,()<>\[\]{}\"\'`\-$=_;%|&#~^])", r" \1 ", text)
 
+    # replace multiple forward slashes
+    text = re.sub(r"\/{3,}", lambda m: splitForwardSlashes(m), text)
+
     # replace tab stops
     text = re.sub(r"\t", "", text)
 
     # replace newlines with a special "end-of-sequence" token
-    text = re.sub(r"\r\n|\r|\n", "<eol>", text)
+    text = re.sub(r"\r\n|\r|\n", " <eol> ", text)
 
     return text
 
