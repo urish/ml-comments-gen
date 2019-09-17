@@ -47,7 +47,7 @@ def clean_token(text):
     text = re.sub(r"(https|http)?:\/\/(\w|\.|\/|\?|\=|\&|\%)*\b", "URL", text)
 
     # custom splitting rule to create space around special code characters
-    text = re.sub(r"([.,()<>\[\]{}\"\'`\-$=_;%|&#~^])", r" \1 ", text)
+    text = re.sub(r"([.,()<>\[\]{}\"\'`\-$=_;%|&#~^\\])", r" \1 ", text)
 
     # replace multiple forward slashes
     text = re.sub(r"\/{3,}", lambda m: splitForwardSlashes(m), text)
