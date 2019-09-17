@@ -226,6 +226,7 @@ with ConditionalScope(create_tpu_scope, tpu):
         "lstm_size": LSTM_LAYER_SIZE,
         "comment_vocab_size": comment_vocab_size,
         "batch_size": batch_size,
+        "epochs": epochs,
     }
 
     params_path = path.join(run_dir, "params.pickle")
