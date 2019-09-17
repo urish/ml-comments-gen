@@ -1,14 +1,11 @@
-import * as tf from '@tensorflow/tfjs-node';
-import * as path from 'path';
-import { ITokenizersJson, CommentPredictor } from './comment-predictor';
+import { CommentPredictor } from './comment-predictor';
+import { loadModel } from './load-model';
 
-const modelDir = path.resolve('../runs/js-500/tfjsmodel');
-const modelFile = path.join(modelDir, 'model.json');
-const tokenizers: ITokenizersJson = require(path.join(modelDir, 'tokenizers.json'));
+const modelDir = '../runs/js-500/tfjsmodel';
 const testFn = 'function printSum(a:number,b:number) { console.log(a + b); }';
 
 async function main() {
-  const model = await tf.loadLayersModel('file://' + modelFile);
+  const {model, tokenizers} = await loadModel(modelDir);
   const predictor = new CommentPredictor(model, tokenizers);
 
   console.log('*** INPUT AST ***');
