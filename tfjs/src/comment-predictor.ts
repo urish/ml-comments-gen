@@ -72,6 +72,7 @@ export class CommentPredictor {
     // Populate the first character of target sequence with the start character.
     let targetSeq = tf.oneHot([startToken], comment_vocab_size).expandDims();
     let firstInLine = true;
+    let prevWord = '';
     for (let i = 0; i < max_comment_len; i++) {
       const [outputTokens, h, c] = this.decoderModel.predict([
         targetSeq,
@@ -80,20 +81,25 @@ export class CommentPredictor {
 
       // Sample a token
       const sampled_token_index = (outputTokens.argMax(2).arraySync() as number[][])[0][0];
-      const next_word = commentTokens[sampled_token_index as number];
+      const nextWord = commentTokens[sampled_token_index as number];
 
-      if (next_word == '<end>') {
+      if (nextWord == '<end>') {
         return;
       }
 
-      if (next_word == '<eol>' || next_word === '<eos>') {
+      if (nextWord == '<eol>' || nextWord === '<eos>') {
         yield '\n';
         firstInLine = true;
+      } else if (nextWord[0] === '>') {
+        const space = (firstInLine || prevWord[0] === '>') ? '' : ' ';
+        yield space + nextWord[1];
+        firstInLine = false;
       } else {
         const space = firstInLine ? '' : ' ';
-        yield space + next_word;
+        yield space + nextWord;
         firstInLine = false;
       }
+      prevWord = nextWord;
 
       targetSeq = tf.oneHot([sampled_token_index], comment_vocab_size).expandDims();
       statesValues = [h, c];
