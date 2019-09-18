@@ -47,6 +47,8 @@ parser.add_argument("-tpu", nargs="?", type=boolean, const=True, default=False)
 
 parser.add_argument("-c", "--checkpoints", nargs="?", type=boolean, const=True, default=True)
 
+parser.add_argument("--checkpoint-root", nargs="?", type=str, const=True)
+
 parser.add_argument("-tb", "--tensorboard", nargs="?", type=boolean, const=True, default=False)
 
 parser.add_argument("--steps-per-epoch", nargs="?", type=int, const=True)
@@ -69,6 +71,7 @@ checkpoints = args.checkpoints
 tensorboard = args.tensorboard
 steps_per_epoch = args.steps_per_epoch
 character_tokenizer = args.character_tokenizer
+checkpoint_root = args.checkpoint_root
 
 run_dir = "../runs/{}".format(run)
 dataset_path = path.join(run_dir, "dataset_clean.csv")
@@ -199,8 +202,7 @@ with ConditionalScope(create_tpu_scope, tpu):
     initial_epoch = 0
 
     if checkpoints:
-        checkpoint_home = "gs://ml-comments-gen/runs/{}".format(run) if tpu else run_dir
-        checkpoint_path = path.join(checkpoint_home, "checkpoints/cp-{epoch:05d}.ckpt")
+        checkpoint_path = path.join(checkpoint_root or run_dir, "checkpoints/cp-{epoch:05d}.ckpt")
         latest_checkpoint = tf.train.latest_checkpoint(path.dirname(checkpoint_path))
 
         fit_callbacks.append(ModelCheckpoint(
