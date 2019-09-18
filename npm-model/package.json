@@ -1,0 +1,13 @@
+{
+  "name": "ts-comment-predictor-model",
+  "version": "0.0.1-2000-trainpy",
+  "typings": "index.d.ts",
+  "main": "index.js",
+  "license": "MIT",
+  "repository": "https://github.com/urish/ml-comments-gen",
+  "author": "Uri Shaked <uri@codemagic.co.il>",
+  "files": [
+    "index.js",
+    "model"
+  ]
+}
