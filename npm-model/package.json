@@ -1,6 +1,6 @@
 {
   "name": "ts-comment-predictor-model",
-  "version": "0.0.2-2000-trainpy",
+  "version": "0.0.4-2000-trainpy",
   "typings": "index.d.ts",
   "main": "index.js",
   "license": "MIT",
@@ -9,6 +9,7 @@
   "files": [
     "index.js",
     "index.d.ts",
-    "model"
+    "model/*.bin",
+    "model/*.json"
   ]
 }
