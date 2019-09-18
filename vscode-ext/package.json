@@ -1,6 +1,6 @@
 {
-	"name": "articulate",
-	"displayName": "articulate",
+	"name": "vscode-auto-comments",
+	"displayName": "vscode-auto-comments",
 	"description": "Automatic comments for your TypeScript code",
 	"version": "0.0.1",
 	"engines": {
@@ -10,13 +10,13 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:extension.articulate"
+		"onCommand:extension.addComment"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
 			{
-				"command": "extension.articulate",
+				"command": "extension.addComment",
 				"title": "Add Comment to Function or Method"
 			}
 		]
@@ -40,6 +40,7 @@
 		"vscode-test": "^1.0.2"
 	},
 	"dependencies": {
-    "ts-comment-predictor": "../tfjs"
+		"ts-comment-predictor": "../tfjs",
+		"ts-comment-predictor-model": "^0.0.1-2000-trainpy"
 	}
 }

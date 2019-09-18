@@ -1,4 +1,4 @@
-# articulate Extension
+# Auto Comment Generator Extension
 
 Automatically adds AI-Generated comments to your functions and methods.
 

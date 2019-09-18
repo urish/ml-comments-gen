@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { isSupportedLanguage, getNodeAtFileOffset, findParentFunction } from './utils';
 import { createSourceFile, ScriptTarget } from 'typescript';
 import { loadModel, CommentPredictor } from 'ts-comment-predictor';
+import { modelPath } from 'ts-comment-predictor-model';
 
 let predictorPromise: Promise<CommentPredictor>;
 
@@ -59,10 +60,10 @@ async function addCommentCommand() {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  predictorPromise = loadModel('C:/p/ml-comments-gen/runs/js-500/tfjsmodel').then(
+  predictorPromise = loadModel(modelPath).then(
     ({ model, tokenizers }) => new CommentPredictor(model, tokenizers),
   );
-  context.subscriptions.push(...[vscode.commands.registerCommand('extension.articulate', addCommentCommand)]);
+  context.subscriptions.push(...[vscode.commands.registerCommand('extension.addComment', addCommentCommand)]);
 }
 
 export function deactivate() {}
