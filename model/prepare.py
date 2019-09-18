@@ -224,7 +224,7 @@ def save_model(model, filename):
 def plot_embeddings(model, df, filename):
     tsne_plot(model, df, filename)
 
-
+df["comments_orig"] = df["comments"]
 df["comments"] = clean_comments(df["comments"])
 
 # remove corrupted rows (mostly comments that are written in languages other than English)
@@ -261,7 +261,7 @@ if train:
     if visualize:
         plot_embeddings(model_asts, df, path.join(run_dir, "word2vec_asts.png"))
 
-dataset_clean = df[["ast", "comments"]]
+dataset_clean = df[["ast", "comments", "comments_orig"]]
 
 if saveDataset:
     dump_dataset(dataset_clean)

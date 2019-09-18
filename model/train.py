@@ -51,6 +51,8 @@ parser.add_argument("-tb", "--tensorboard", nargs="?", type=boolean, const=True,
 
 parser.add_argument("--steps-per-epoch", nargs="?", type=int, const=True)
 
+parser.add_argument("--character-tokenizer", nargs="?", type=boolean, const=True, default=False)
+
 args = parser.parse_args()
 
 if not args.run:
@@ -66,6 +68,7 @@ word_vectors = args.word_vectors
 checkpoints = args.checkpoints
 tensorboard = args.tensorboard
 steps_per_epoch = args.steps_per_epoch
+character_tokenizer = args.character_tokenizer
 
 run_dir = "../runs/{}".format(run)
 dataset_path = path.join(run_dir, "dataset_clean.csv")
@@ -78,11 +81,12 @@ if not path.exists(run_dir):
     )
 
 
-def create_tokenizer(name, num_words=None):
+def create_tokenizer(name, num_words=None, char_level=False):
     print("Creating tokenizer for '{}'".format(name))
     print("Using num_words={}".format(num_words))
     return tf.keras.preprocessing.text.Tokenizer(
-        filters="", split=" ", lower=False, oov_token="UNK", num_words=num_words
+        filters="", split=" ", lower=False, oov_token="UNK", num_words=num_words,
+        char_level=char_level
     )
 
 
@@ -92,24 +96,28 @@ n_observations = df.shape[0]
 print("Observations: {}".format(n_observations))
 
 asts = df["ast"]
-comments = df["comments"]
-
-comment_tokenizer = create_tokenizer("Comments", VOCAB_SIZE)
-fallback_tokens = fallback_tokenizer_dictionary()
-comment_tokenizer.fit_on_texts(chain(fallback_tokens * len(comments), comments))
+comments = df["comments"] if not character_tokenizer else df["comments_orig"]
+comment_tokenizer = create_tokenizer("Comments", VOCAB_SIZE, character_tokenizer)
+if character_tokenizer:
+    comment_tokenizer.fit_on_texts(comments)
+else:
+    fallback_tokens = fallback_tokenizer_dictionary()
+    comment_tokenizer.fit_on_texts(chain(fallback_tokens * len(comments), comments))
 
 ast_tokenizer = create_tokenizer("ASTs")
 ast_tokenizer.fit_on_texts(asts)
 
 # we add two to account for padding and an eof token
 ast_vocab_size = len(ast_tokenizer.word_index) + 2
-comment_vocab_size = VOCAB_SIZE + 2
-
+comment_vocab_size = min(len(comment_tokenizer.word_index), VOCAB_SIZE) + 2
 print("Vocabulary size: ast={}, comments={}".format(ast_vocab_size, comment_vocab_size))
 
 # translate each word to the matching vocabulary index
 ast_sequences = ast_tokenizer.texts_to_sequences(asts)
-comment_sequences = tokenize_with_fallback(comment_tokenizer, comments, VOCAB_SIZE)
+if character_tokenizer:
+    comment_sequences = comment_tokenizer.texts_to_sequences(comments)
+else:
+    comment_sequences = tokenize_with_fallback(comment_tokenizer, comments, VOCAB_SIZE)
 
 encoder_input_data = np.zeros(
     (len(ast_sequences), MAX_AST_LEN, ast_vocab_size), dtype="float32"
@@ -242,6 +250,7 @@ with ConditionalScope(create_tpu_scope, tpu):
         "comment_vocab_size": comment_vocab_size,
         "batch_size": batch_size,
         "epochs": epochs,
+        "character_tokenizer": character_tokenizer,
     }
 
     params_path = path.join(run_dir, "params.pickle")
