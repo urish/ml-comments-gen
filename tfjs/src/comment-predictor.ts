@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { dumpAst } from './dump-ast';
+import { getSubstitutionsDict } from './rename-args-in-comments';
 
 export interface ITokenizersJson {
   params: {
@@ -12,6 +13,25 @@ export interface ITokenizersJson {
   };
   ast: { [key: string]: number };
   comments: { [key: string]: string };
+}
+
+function* commentTokenizer(comment: Iterable<string>) {
+  let buffer = '';
+  for (let item of comment) {
+    buffer += item;
+    while (buffer.length > 0) {
+      const matches = buffer.match(/\W+|\w+/g) || [];
+      if (matches.length < 2) {
+        break;
+      }
+      yield matches[0];
+      buffer = buffer.slice(matches[0].length);
+    }
+  }
+  const matches = buffer.match(/\W+|\w+/) || [];
+  for (let match of matches) {
+    yield match;
+  }
 }
 
 export class CommentPredictor {
@@ -46,14 +66,14 @@ export class CommentPredictor {
     return dumpAst(functionDecl, true);
   }
 
-  *predict(functionDecl: string) {
+  *predictInternal(functionDecl: string) {
     const { ast: astTokens, comments: commentTokens } = this.tokenizers;
     const {
       max_ast_len,
       max_comment_len,
       ast_vocab_size,
       comment_vocab_size,
-      character_tokenizer,
+      character_tokenizer
     } = this.tokenizers.params;
 
     const ast = this.ast(functionDecl);
@@ -101,7 +121,7 @@ export class CommentPredictor {
         yield '\n';
         firstInLine = true;
       } else if (nextWord[0] === '>') {
-        const space = (firstInLine || prevWord[0] === '>') ? '' : ' ';
+        const space = firstInLine || prevWord[0] === '>' ? '' : ' ';
         yield space + nextWord[1];
         firstInLine = false;
       } else {
@@ -113,6 +133,18 @@ export class CommentPredictor {
 
       targetSeq = tf.oneHot([sampled_token_index], comment_vocab_size).expandDims();
       statesValues = [h, c];
+    }
+  }
+
+  *predict(functionDecl: string) {
+    const substitutions = getSubstitutionsDict(functionDecl, true);
+    let buffer = '';
+    for (let token of commentTokenizer(this.predictInternal(functionDecl))) {
+      if (token in substitutions) {
+        yield substitutions[token];
+      } else {
+        yield token;
+      }
     }
   }
 }

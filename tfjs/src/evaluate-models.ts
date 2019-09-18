@@ -48,7 +48,7 @@ const demoFns = [
     this.instrument.enabled = !this.instrument.enabled;
   }`
 ];
-const modelNames = ['js-500', 'js-600', '860', '2000', '2000-trainpy', '2500-char'];
+const modelNames = ['js-500', 'js-600', '860', '2000', '2000-trainpy', '2500-char', '7930'];
 const modelDir = '../runs';
 const outputFileName = 'evaluate.json';
 

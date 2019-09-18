@@ -23,11 +23,15 @@ function createDict(argNames: string[], functionName: string | undefined, revers
   return dict;
 }
 
-export function renameArgsInComments(comments: string, source: string, reverse = false) {
+export function getSubstitutionsDict(source: string, reverse = false) {
   const targetNode = functionOrMethodAST(source);
   const argNames = targetNode.parameters.map((p) => p.name.getText());
   const functionName = targetNode.name && targetNode.name.getText();
+  return createDict(argNames, functionName, reverse);
+}
+
+export function renameArgsInComments(comments: string, source: string, reverse = false) {
   const tokens = comments.match(/\W+|\w+/g) || [];
-  const dict = createDict(argNames, functionName, reverse);
+  const dict = getSubstitutionsDict(source, reverse);
   return tokens.map((token) => (token in dict ? dict[token] : token)).join('');
 }
