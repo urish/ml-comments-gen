@@ -8,6 +8,7 @@ export interface ITokenizersJson {
     max_ast_len: number;
     max_comment_len: number;
     lstm_layer_size: number;
+    character_tokenizer: number;
   };
   ast: { [key: string]: number };
   comments: { [key: string]: string };
@@ -47,15 +48,12 @@ export class CommentPredictor {
 
   *predict(functionDecl: string) {
     const { ast: astTokens, comments: commentTokens } = this.tokenizers;
-    const startToken = parseInt(
-      Object.keys(commentTokens).find((k) => commentTokens[k] === '<start>')!,
-      10
-    );
     const {
       max_ast_len,
       max_comment_len,
       ast_vocab_size,
-      comment_vocab_size
+      comment_vocab_size,
+      character_tokenizer,
     } = this.tokenizers.params;
 
     const ast = this.ast(functionDecl);
@@ -69,10 +67,20 @@ export class CommentPredictor {
       .expandDims();
     let statesValues = this.encoderModel.predict(inputSeq) as tf.Tensor[];
 
+    const startToken = character_tokenizer ? '/' : '<start>';
+    const startTokenValue = parseInt(
+      Object.keys(commentTokens).find((k) => commentTokens[k] === startToken)!,
+      10
+    );
+    if (character_tokenizer) {
+      yield startToken;
+    }
+
     // Populate the first character of target sequence with the start character.
-    let targetSeq = tf.oneHot([startToken], comment_vocab_size).expandDims();
+    let targetSeq = tf.oneHot([startTokenValue], comment_vocab_size).expandDims();
     let firstInLine = true;
     let prevWord = '';
+
     for (let i = 0; i < max_comment_len; i++) {
       const [outputTokens, h, c] = this.decoderModel.predict([
         targetSeq,
@@ -83,11 +91,13 @@ export class CommentPredictor {
       const sampled_token_index = (outputTokens.argMax(2).arraySync() as number[][])[0][0];
       const nextWord = commentTokens[sampled_token_index as number];
 
-      if (nextWord == '<end>') {
+      if (nextWord == '<end>' || !nextWord) {
         return;
       }
 
-      if (nextWord == '<eol>' || nextWord === '<eos>') {
+      if (character_tokenizer) {
+        yield nextWord;
+      } else if (nextWord == '<eol>' || nextWord === '<eos>') {
         yield '\n';
         firstInLine = true;
       } else if (nextWord[0] === '>') {
