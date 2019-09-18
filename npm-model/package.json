@@ -1,6 +1,6 @@
 {
   "name": "ts-comment-predictor-model",
-  "version": "0.0.1-2000-trainpy",
+  "version": "0.0.2-2000-trainpy",
   "typings": "index.d.ts",
   "main": "index.js",
   "license": "MIT",
@@ -8,6 +8,7 @@
   "author": "Uri Shaked <uri@codemagic.co.il>",
   "files": [
     "index.js",
+    "index.d.ts",
     "model"
   ]
 }
