@@ -55,6 +55,8 @@ parser.add_argument("--steps-per-epoch", nargs="?", type=int, const=True)
 
 parser.add_argument("--character-tokenizer", nargs="?", type=boolean, const=True, default=False)
 
+parser.add_argument("--skip-test", nargs="?", type=boolean, const=True, default=False)
+
 args = parser.parse_args()
 
 if not args.run:
@@ -72,6 +74,7 @@ tensorboard = args.tensorboard
 steps_per_epoch = args.steps_per_epoch
 character_tokenizer = args.character_tokenizer
 checkpoint_root = args.checkpoint_root
+skip_test = args.skip_test
 
 run_dir = "../runs/{}".format(run)
 dataset_path = path.join(run_dir, "dataset_clean.csv")
@@ -270,25 +273,26 @@ with ConditionalScope(create_tpu_scope, tpu):
             ]
         }, f, indent=2)
 
-    print("------------------------------")
-    print("|           TEST             |")
-    print("------------------------------")
+    if not skip_test:
+        print("------------------------------")
+        print("|           TEST             |")
+        print("------------------------------")
 
-    # test model on single input
+        # test model on single input
 
-    ast_in = np.random.choice(asts.values, 1)[0]
+        ast_in = np.random.choice(asts.values, 1)[0]
 
-    result = predict_comment(
-        ast_in,
-        ast_tokenizer,
-        comment_tokenizer,
-        MAX_AST_LEN,
-        MAX_COMMENT_LEN,
-        model,
-        ast_vocab_size,
-        comment_vocab_size,
-        LSTM_LAYER_SIZE,
-    )
+        result = predict_comment(
+            ast_in,
+            ast_tokenizer,
+            comment_tokenizer,
+            MAX_AST_LEN,
+            MAX_COMMENT_LEN,
+            model,
+            ast_vocab_size,
+            comment_vocab_size,
+            LSTM_LAYER_SIZE,
+        )
 
-    print("Input: %s\n" % (ast_in))
-    print("Predicted Comment: {}\n".format(result))
+        print("Input: %s\n" % (ast_in))
+        print("Predicted Comment: {}\n".format(result))
