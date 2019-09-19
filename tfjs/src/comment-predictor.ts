@@ -1,6 +1,7 @@
 import * as tf from '@tensorflow/tfjs-node';
 import { dumpAst } from './dump-ast';
 import { getSubstitutionsDict } from './rename-args-in-comments';
+import { loadModel } from './load-model';
 
 export interface ITokenizersJson {
   params: {
@@ -60,6 +61,11 @@ export class CommentPredictor {
       inputs: [decoder_inputs, ...decoder_states_inputs],
       outputs: [decoder_outputs, ...decoder_states]
     });
+  }
+
+  static async loadFrom(modelPath: string) {
+    const { model, tokenizers } = await loadModel(modelPath);
+    return new CommentPredictor(model, tokenizers);
   }
 
   ast(functionDecl: string) {
