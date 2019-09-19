@@ -69,7 +69,7 @@ export class CommentPredictor {
   }
 
   ast(functionDecl: string) {
-    return dumpAst(functionDecl, true);
+    return dumpAst(functionDecl, { functionOrMethod: true });
   }
 
   private *predictInternal(functionDecl: string) {

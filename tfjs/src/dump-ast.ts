@@ -1,10 +1,18 @@
 import { tsquery } from '@phenomnomnominal/tsquery';
 import 'array-flat-polyfill';
-import { Node } from 'typescript';
+import { Node, isIdentifier } from 'typescript';
 import { functionOrMethodAST } from './ast-utils';
 
-function traverse(node: Node): string {
-  const nodeKind = tsquery.syntaxKindName(node.kind);
+export interface IDumpAstOptions {
+  functionOrMethod?: boolean;
+  includeIdentifiers?: boolean;
+}
+
+function traverse(node: Node, options: IDumpAstOptions): string {
+  let nodeKind = tsquery.syntaxKindName(node.kind);
+  if (options.includeIdentifiers && isIdentifier(node)) {
+    nodeKind += ` [${node.text}]`;
+  }
   if (!node.getChildren().length) {
     return nodeKind;
   }
@@ -13,13 +21,13 @@ function traverse(node: Node): string {
     ' ( ' +
     node
       .getChildren()
-      .map((child) => traverse(child))
+      .map((child) => traverse(child, options))
       .join(' ') +
     ' )'
   );
 }
 
-export function dumpAst(source: string, functionOrMethod = false) {
-  const ast = functionOrMethod ? functionOrMethodAST(source) : tsquery.ast(source);
-  return traverse(ast).replace(/^SourceFile \( SyntaxList | \)$/g, '');
+export function dumpAst(source: string, options: IDumpAstOptions = {}) {
+  const ast = options.functionOrMethod ? functionOrMethodAST(source) : tsquery.ast(source);
+  return traverse(ast, options).replace(/^SourceFile \( SyntaxList | \)$/g, '');
 }

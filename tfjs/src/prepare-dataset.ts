@@ -45,7 +45,7 @@ function prepareEntry(input: IInputRecord) {
     character,
     code: input.text,
     comments: renameArgsInComments(cleanJsDoc(input.comments), input.text),
-    ast: dumpAst(input.text, true)
+    ast: dumpAst(input.text, { functionOrMethod: true })
   };
 }
 
