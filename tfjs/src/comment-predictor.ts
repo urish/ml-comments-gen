@@ -72,7 +72,7 @@ export class CommentPredictor {
     return dumpAst(functionDecl, true);
   }
 
-  *predictInternal(functionDecl: string) {
+  private *predictInternal(functionDecl: string) {
     const { ast: astTokens, comments: commentTokens } = this.tokenizers;
     const {
       max_ast_len,
@@ -142,9 +142,8 @@ export class CommentPredictor {
     }
   }
 
-  *predict(functionDecl: string) {
+  *predictTokens(functionDecl: string) {
     const substitutions = getSubstitutionsDict(functionDecl, true);
-    let buffer = '';
     for (let token of commentTokenizer(this.predictInternal(functionDecl))) {
       if (token in substitutions) {
         yield substitutions[token];
@@ -152,5 +151,9 @@ export class CommentPredictor {
         yield token;
       }
     }
+  }
+
+  predict(functionDecl: string) {
+    return Array.from(this.predictTokens(functionDecl)).join('');
   }
 }
