@@ -144,6 +144,9 @@ export class CommentPredictor {
 
   *predictTokens(functionDecl: string) {
     const substitutions = getSubstitutionsDict(functionDecl, true);
+    for (let key of Object.keys(substitutions)) {
+      substitutions[key.toLowerCase()] = substitutions[key];
+    }
     for (let token of commentTokenizer(this.predictInternal(functionDecl))) {
       if (token in substitutions) {
         yield substitutions[token];
