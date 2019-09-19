@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { isSupportedLanguage, getNodeAtFileOffset, findParentFunction, getNodeAtCursor } from './utils';
-import { createSourceFile, ScriptTarget } from 'typescript';
+import { isSupportedLanguage, findParentFunction, getNodeAtCursor } from './utils';
 import { loadModel, CommentPredictor } from 'ts-comment-predictor';
 import { modelPath } from 'ts-comment-predictor-model';
 
