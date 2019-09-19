@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { isSupportedLanguage, getNodeAtFileOffset, findParentFunction } from './utils';
+import { isSupportedLanguage, getNodeAtFileOffset, findParentFunction, getNodeAtCursor } from './utils';
 import { createSourceFile, ScriptTarget } from 'typescript';
 import { loadModel, CommentPredictor } from 'ts-comment-predictor';
 import { modelPath } from 'ts-comment-predictor-model';
@@ -21,8 +21,7 @@ async function addCommentCommand() {
     return;
   }
 
-  const ast = createSourceFile(editor.document.fileName, editor.document.getText(), ScriptTarget.Latest, true);
-  const node = getNodeAtFileOffset(ast, editor.document.offsetAt(editor.selection.active));
+  const node = getNodeAtCursor(editor);
   const parentFunction = findParentFunction(node);
   if (parentFunction) {
     const startPos = editor.document.positionAt(parentFunction.getStart());

@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import {
   forEachChild,
   FunctionDeclaration,
@@ -5,6 +6,8 @@ import {
   isMethodDeclaration,
   MethodDeclaration,
   Node,
+  createSourceFile,
+  ScriptTarget,
 } from 'typescript';
 
 export const supportedLanguageIds = ['javascript', 'javascriptreact', 'typescript', 'typescriptreact'];
@@ -33,4 +36,13 @@ export function findParentFunction(node: Node | null): FunctionDeclaration | Met
     return node;
   }
   return findParentFunction(node.parent);
+}
+
+export function getAstFromDocument(document: vscode.TextDocument) {
+  return createSourceFile(document.fileName, document.getText(), ScriptTarget.Latest, true);
+}
+
+export function getNodeAtCursor(editor: vscode.TextEditor) {
+  const ast = getAstFromDocument(editor.document);
+  return getNodeAtFileOffset(ast, editor.document.offsetAt(editor.selection.active));
 }
