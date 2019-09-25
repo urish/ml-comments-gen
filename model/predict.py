@@ -59,6 +59,8 @@ if __name__ == "__main__":
     ast_vocab_size = params.get("ast_vocab_size")
     comment_vocab_size = params.get("comment_vocab_size")
     lstm_layer_size = params.get("lstm_layer_size")
+    comment_start_token = params.get("comment_start_token")
+    comment_end_token = params.get("comment_end_token")
 
     result = predict_comment(
         ast_in,
@@ -70,6 +72,8 @@ if __name__ == "__main__":
         ast_vocab_size,
         comment_vocab_size,
         lstm_layer_size,
+        comment_start_token,
+        comment_end_token,
     )
 
     print("AST: {}\n".format(ast_in))

@@ -59,6 +59,8 @@ def decode_sequence(
     comment_vocab_size,
     comment_tokenizer,
     max_comment_len,
+    comment_start_token,
+    comment_end_token,
 ):
     # Encode the input as state vectors.
     states_value = encoder_model.predict(input_seq)
@@ -66,7 +68,7 @@ def decode_sequence(
     # Generate empty target sequence of length 1.
     target_seq = np.zeros((1, 1, comment_vocab_size))
     # Populate the first character of target sequence with the start character.
-    target_seq[0, 0, comment_tokenizer.word_index["<start>"]] = 1.0
+    target_seq[0, 0, comment_start_token] = 1.0
 
     # Sampling loop for a batch of sequences
     # (to simplify, here we assume a batch of size 1).
@@ -76,20 +78,9 @@ def decode_sequence(
 
         # Sample a token
         sampled_token_index = np.argmax(output_tokens[0, -1, :])
-        next_word = comment_tokenizer.index_word[sampled_token_index]
-
-        space = (' ' if prev_word != '' else '')
-        if next_word == "<end>":
+        if sampled_token_index == comment_end_token:
             break
-        elif next_word in ["<eol>", "<eos>"]:
-            yield "\n"
-        elif next_word[0] == '>':
-            if prev_word[0] == '>':
-                space = ''
-            yield space + next_word[1]
-        else:
-            yield space + next_word
-        prev_word = next_word
+        yield comment_tokenizer.decode([sampled_token_index])
 
         # Update the target sequence (of length 1).
         target_seq = np.zeros((1, 1, comment_vocab_size))
@@ -109,6 +100,8 @@ def predict_comment(
     ast_vocab_size,
     comment_vocab_size,
     lstm_layer_size,
+    comment_start_token,
+    comment_end_token,
 ):
     encoder_model, decoder_model = get_encoder_decoder(model, lstm_layer_size)
     input_asts = ast_tokenizer.texts_to_sequences([ast_in])
@@ -128,6 +121,8 @@ def predict_comment(
         comment_vocab_size,
         comment_tokenizer,
         max_comment_len,
+        comment_start_token,
+        comment_end_token,
     )
     return "".join(list(result))
 
