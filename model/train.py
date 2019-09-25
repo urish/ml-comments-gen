@@ -74,7 +74,7 @@ checkpoint_root = args.checkpoint_root
 skip_test = args.skip_test
 
 run_dir = "../runs/{}".format(run)
-dataset_path = path.join(run_dir, "dataset_clean.csv")
+dataset_path = path.join(run_dir, "dataset.json")
 
 if not path.exists(run_dir):
     sys.exit(
@@ -83,37 +83,28 @@ if not path.exists(run_dir):
         )
     )
 
-
-def create_tokenizer(name, num_words=None, char_level=False):
-    print("Creating tokenizer for '{}'".format(name))
-    print("Using num_words={}".format(num_words))
-    return tf.keras.preprocessing.text.Tokenizer(
-        filters="", split=" ", lower=False, oov_token="UNK", num_words=num_words,
-        char_level=char_level
-    )
-
-
-df = pd.read_csv(dataset_path)
+df = pd.read_json(dataset_path, lines=True)
 n_observations = df.shape[0]
 
 print("Observations: {}".format(n_observations))
 
 asts = df["ast"]
-comments = df["comments_orig"]
+comments = df["comments"]
+
+ast_tokenizer = SubwordTextEncoder.build_from_corpus(asts, target_vocab_size=VOCAB_SIZE)
 comment_tokenizer = SubwordTextEncoder.build_from_corpus(comments, target_vocab_size=VOCAB_SIZE)
 
-ast_tokenizer = create_tokenizer("ASTs")
-ast_tokenizer.fit_on_texts(asts)
-
 # we add two to account for padding and an eof token
-ast_vocab_size = len(ast_tokenizer.word_index) + 2
+ast_start_token = ast_tokenizer.vocab_size 
+ast_end_token = ast_start_token + 1
+ast_vocab_size = ast_end_token + 1
 comment_start_token = comment_tokenizer.vocab_size
 comment_end_token = comment_start_token + 1
 comment_vocab_size = comment_end_token + 1
 print("Vocabulary size: ast={}, comments={}".format(ast_vocab_size, comment_vocab_size))
 
 # translate each word to the matching vocabulary index
-ast_sequences = ast_tokenizer.texts_to_sequences(asts)
+ast_sequences = [[ast_start_token] + ast_tokenizer.encode(ast) + [ast_end_token] for ast in asts]
 comment_sequences = [[comment_start_token] + comment_tokenizer.encode(comment) + [comment_end_token] for comment in comments]
 
 encoder_input_data = np.zeros(
@@ -128,17 +119,17 @@ decoder_target_data = np.zeros(
     (len(comment_sequences), MAX_COMMENT_LEN, comment_vocab_size), dtype="float32"
 )
 
-ast_eof_token = ast_vocab_size - 1
-
 for i, (input_text, target_text) in enumerate(zip(ast_sequences, comment_sequences)):
     for t, token in enumerate(input_text):
+        if t >= MAX_AST_LEN:
+            break
         encoder_input_data[i, t] = token
 
-    encoder_input_data[i, t + 1:] = ast_eof_token
+    encoder_input_data[i, t + 1:] = ast_end_token
 
     for t, token in enumerate(target_text):
         if t >= MAX_COMMENT_LEN:
-            continue
+            break
 
         # decoder_target_data is ahead of decoder_input_data by one timestep
         decoder_input_data[i, t] = token
@@ -249,6 +240,8 @@ with ConditionalScope(create_tpu_scope, tpu):
         "epochs": epochs,
         "comment_start_token": comment_start_token,
         "comment_end_token": comment_end_token,
+        "ast_start_token": ast_start_token,
+        "ast_end_token": ast_end_token,
     }
 
     params_path = path.join(run_dir, "params.pickle")
@@ -287,6 +280,8 @@ with ConditionalScope(create_tpu_scope, tpu):
             LSTM_LAYER_SIZE,
             comment_start_token,
             comment_end_token,
+            ast_start_token,
+            ast_end_token,
         )
 
         print("Input: %s\n" % (ast_in))

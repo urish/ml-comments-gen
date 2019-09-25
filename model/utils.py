@@ -102,16 +102,18 @@ def predict_comment(
     lstm_layer_size,
     comment_start_token,
     comment_end_token,
+    ast_start_token,
+    ast_end_token,
 ):
     encoder_model, decoder_model = get_encoder_decoder(model, lstm_layer_size)
-    input_asts = ast_tokenizer.texts_to_sequences([ast_in])
+    input_asts = [[ast_start_token] + ast_tokenizer.encode(ast_in) + [ast_end_token]]
 
     encoder_input_data = np.zeros(
         (len(input_asts), max_ast_len), dtype="float32"
     )
 
     for i, input_text in enumerate(input_asts):
-        for t, token in enumerate(input_text):
+        for t, token in enumerate(input_text[:max_ast_len]):
             encoder_input_data[i, t] = token
 
     result = decode_sequence(
