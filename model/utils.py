@@ -27,7 +27,7 @@ def load_tokenizer(file_path):
 
 def get_encoder_decoder(model, lstm_layer_size):
     encoder_inputs = model.input[0]  # input_1
-    _, state_h_enc, state_c_enc = model.layers[2].output  # lstm_1
+    _, state_h_enc, state_c_enc = model.layers[4].output  # lstm_1
     encoder_states = [state_h_enc, state_c_enc]
     encoder_model = Model(encoder_inputs, encoder_states)
 
@@ -35,14 +35,15 @@ def get_encoder_decoder(model, lstm_layer_size):
     decoder_state_input_h = Input(shape=(lstm_layer_size,), name="input_3")
     decoder_state_input_c = Input(shape=(lstm_layer_size,), name="input_4")
     decoder_states_inputs = [decoder_state_input_h, decoder_state_input_c]
-    decoder_lstm = model.layers[3]
+    decoder_embeddings = model.layers[3](decoder_inputs)
+    decoder_lstm = model.layers[5]
 
     decoder_outputs, state_h_dec, state_c_dec = decoder_lstm(
-        decoder_inputs, initial_state=decoder_states_inputs
+        decoder_embeddings, initial_state=decoder_states_inputs
     )
 
     decoder_states = [state_h_dec, state_c_dec]
-    decoder_dense = model.layers[4]
+    decoder_dense = model.layers[6]
     decoder_outputs = decoder_dense(decoder_outputs)
 
     decoder_model = Model(
@@ -66,9 +67,9 @@ def decode_sequence(
     states_value = encoder_model.predict(input_seq)
 
     # Generate empty target sequence of length 1.
-    target_seq = np.zeros((1, 1, comment_vocab_size))
+    target_seq = np.zeros((1, 1))
     # Populate the first character of target sequence with the start character.
-    target_seq[0, 0, comment_start_token] = 1.0
+    target_seq[0, 0] = comment_start_token
 
     # Sampling loop for a batch of sequences
     # (to simplify, here we assume a batch of size 1).
@@ -83,8 +84,7 @@ def decode_sequence(
         yield comment_tokenizer.decode([sampled_token_index])
 
         # Update the target sequence (of length 1).
-        target_seq = np.zeros((1, 1, comment_vocab_size))
-        target_seq[0, 0, sampled_token_index] = 1.0
+        target_seq[0, 0] = sampled_token_index
 
         # Update states
         states_value = [h, c]
@@ -107,12 +107,12 @@ def predict_comment(
     input_asts = ast_tokenizer.texts_to_sequences([ast_in])
 
     encoder_input_data = np.zeros(
-        (len(input_asts), max_ast_len, ast_vocab_size), dtype="float32"
+        (len(input_asts), max_ast_len), dtype="float32"
     )
 
     for i, input_text in enumerate(input_asts):
         for t, token in enumerate(input_text):
-            encoder_input_data[i, t, token] = 1.0
+            encoder_input_data[i, t] = token
 
     result = decode_sequence(
         encoder_input_data,

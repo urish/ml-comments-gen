@@ -117,11 +117,11 @@ ast_sequences = ast_tokenizer.texts_to_sequences(asts)
 comment_sequences = [[comment_start_token] + comment_tokenizer.encode(comment) + [comment_end_token] for comment in comments]
 
 encoder_input_data = np.zeros(
-    (len(ast_sequences), MAX_AST_LEN, ast_vocab_size), dtype="float32"
+    (len(ast_sequences), MAX_AST_LEN), dtype="float32"
 )
 
 decoder_input_data = np.zeros(
-    (len(comment_sequences), MAX_COMMENT_LEN, comment_vocab_size), dtype="float32"
+    (len(comment_sequences), MAX_COMMENT_LEN), dtype="float32"
 )
 
 decoder_target_data = np.zeros(
@@ -129,28 +129,27 @@ decoder_target_data = np.zeros(
 )
 
 ast_eof_token = ast_vocab_size - 1
-comment_eof_token = comment_vocab_size - 1
 
 for i, (input_text, target_text) in enumerate(zip(ast_sequences, comment_sequences)):
     for t, token in enumerate(input_text):
-        encoder_input_data[i, t, token] = 1.0
+        encoder_input_data[i, t] = token
 
-    encoder_input_data[i, t + 1 :, ast_eof_token] = 1.0
+    encoder_input_data[i, t + 1:] = ast_eof_token
 
     for t, token in enumerate(target_text):
         if t >= MAX_COMMENT_LEN:
             continue
 
         # decoder_target_data is ahead of decoder_input_data by one timestep
-        decoder_input_data[i, t, token] = 1.0
+        decoder_input_data[i, t] = token
 
         if t > 0:
             # decoder_target_data will be ahead by one timestep
             # and will not include the start character.
             decoder_target_data[i, t - 1, token] = 1.0
 
-    decoder_input_data[i, t + 1 :, comment_eof_token] = 1.0
-    decoder_target_data[i, t:, comment_eof_token] = 1.0
+    decoder_input_data[i, t+1:] = comment_end_token
+    decoder_target_data[i, t:, comment_end_token] = 1.0
 
 
 def create_tpu_scope():
@@ -165,19 +164,21 @@ def create_tpu_scope():
 
 with ConditionalScope(create_tpu_scope, tpu):
     # Define an input sequence and process it.
-    encoder_inputs = Input(shape=(None, ast_vocab_size))
+    encoder_inputs = Input(shape=(None,))
+    encoder_embeddings = Embedding(ast_vocab_size, EMBEDDING_DIM)(encoder_inputs)
     encoder = LSTM(LSTM_LAYER_SIZE, return_state=True)
-    encoder_outputs, state_h, state_c = encoder(encoder_inputs)
+    encoder_outputs, state_h, state_c = encoder(encoder_embeddings)
     # We discard `encoder_outputs` and only keep the states.
     encoder_states = [state_h, state_c]
 
     # Set up the decoder, using `encoder_states` as initial state.
-    decoder_inputs = Input(shape=(None, comment_vocab_size))
+    decoder_inputs = Input(shape=(None,))
+    decoder_embeddings = Embedding(comment_vocab_size, EMBEDDING_DIM)(decoder_inputs)
     # We set up our decoder to return full output sequences,
     # and to return internal states as well. We don't use the
     # return states in the training model, but we will use them in inference.
     decoder_lstm = LSTM(LSTM_LAYER_SIZE, return_sequences=True, return_state=True)
-    decoder_outputs, _, _ = decoder_lstm(decoder_inputs, initial_state=encoder_states)
+    decoder_outputs, _, _ = decoder_lstm(decoder_embeddings, initial_state=encoder_states)
     decoder_dense = Dense(comment_vocab_size, activation="softmax")
     decoder_outputs = decoder_dense(decoder_outputs)
 
