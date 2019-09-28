@@ -25,33 +25,17 @@ async function addCommentCommand() {
   if (parentFunction) {
     const startPos = editor.document.positionAt(parentFunction.getStart());
     const indent = ' '.repeat(startPos.character);
-    const predictor = await predictorPromise;
-    await editor.edit((editBuilder) => {
-      editBuilder.insert(startPos, '/* */\n' + indent);
-    });
-    let currentPos = new vscode.Position(startPos.line, startPos.character + 1);
-    for (let token of predictor.predict(parentFunction.getText())) {
-      if (token.startsWith('*/')) {
-        continue;
-      }
-      if (token.startsWith('/*')) {
-        token = token.substr(2);
-        if (!token.trim()) {
-          continue;
-        }
-      }
-      if (token[0] === '\n') {
-        token += indent;
-      }
-      await editor.edit((editBuilder) => {
-        editBuilder.insert(currentPos, token);
+
+    vscode.window.withProgress({
+      title: 'Predicting comment...',
+      location: vscode.ProgressLocation.Notification,
+    }, async () => {
+      const predictor = await predictorPromise;
+      const comment = predictor.predict(parentFunction.getText());
+      editor.edit((editBuilder) => {
+        editBuilder.insert(startPos, comment + '\n' + indent);
       });
-      if (token[0] === '\n') {
-        currentPos = new vscode.Position(currentPos.line + 1, token.length - 1);
-      } else {
-        currentPos = new vscode.Position(currentPos.line, currentPos.character + token.length);
-      }
-    }
+    });
   } else {
     vscode.window.showInformationMessage('Please place the caret inside a function or a method');
   }

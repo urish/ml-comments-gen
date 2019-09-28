@@ -40,7 +40,7 @@
 		"vscode-test": "^1.0.2"
 	},
 	"dependencies": {
-		"ts-comment-predictor": "^0.1.0",
+		"ts-comment-predictor": "^0.1.4",
 		"ts-comment-predictor-model": "0.0.4-2000-trainpy"
 	}
 }
